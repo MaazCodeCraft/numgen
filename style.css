@@ -1,0 +1,138 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+  font-family: 'Segoe UI', sans-serif;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px;
+}
+
+h1 {
+  font-size: 2rem;
+  margin-bottom: 8px;
+  background: linear-gradient(90deg, #a78bfa, #60a5fa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+p.subtitle {
+  color: #94a3b8;
+  margin-bottom: 30px;
+  font-size: 0.95rem;
+}
+
+.input-area {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+input[type="number"] {
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: 2px solid #4f46e5;
+  background: #1e1b4b;
+  color: #fff;
+  font-size: 1rem;
+  width: 200px;
+  outline: none;
+  transition: border 0.2s;
+}
+
+input[type="number"]:focus { border-color: #818cf8; }
+
+button.generate-btn {
+  padding: 12px 28px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+button.generate-btn:hover { opacity: 0.9; transform: scale(1.02); }
+
+.output-wrapper {
+  width: 100%;
+  max-width: 900px;
+  background: #1e1b4b;
+  border-radius: 16px;
+  border: 1px solid #312e81;
+  overflow: hidden;
+  display: none;
+}
+
+.output-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  background: #312e81;
+}
+
+.output-header span { font-size: 0.9rem; color: #c7d2fe; }
+
+.copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 1px solid #6366f1;
+  background: transparent;
+  color: #a5b4fc;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.copy-btn:hover { background: #4f46e5; color: #fff; }
+
+.copy-btn svg { width: 15px; height: 15px; }
+
+#output {
+  padding: 20px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.92rem;
+  color: #e0e7ff;
+  max-height: 500px;
+  overflow-y: auto;
+  white-space: normal;
+  word-break: break-word;
+}
+
+#output div {
+  line-height: 2;
+}
+
+#output::-webkit-scrollbar { width: 6px; }
+#output::-webkit-scrollbar-track { background: #1e1b4b; }
+#output::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 4px; }
+
+.num { color: #93c5fd; }
+.sep { color: #6366f1; }
+
+.toast {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  background: #22c55e;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.3s, transform 0.3s;
+  pointer-events: none;
+}
+
+.toast.show { opacity: 1; transform: translateY(0); }
