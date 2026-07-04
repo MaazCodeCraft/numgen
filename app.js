@@ -553,18 +553,12 @@ document.getElementById('imposeBtn').addEventListener('click', async () => {
         // pdf-lib Y is bottom-up
         const cellY = sheetH - MARGIN - (row + 1) * cellH - row * GAP;
 
-        // Cell border
-        sheet.drawRectangle({
-          x: cellX, y: cellY, width: cellW, height: cellH,
-          borderColor: PDFLib.rgb(0.7, 0.7, 0.7), borderWidth: 0.5,
-        });
-
         if (pageNum === 0 || pageNum > srcPageCount) {
           // Blank cell
           sheet.drawRectangle({
-            x: cellX + 0.5, y: cellY + 0.5,
-            width: cellW - 1, height: cellH - 1,
+            x: cellX, y: cellY, width: cellW, height: cellH,
             color: PDFLib.rgb(0.96, 0.96, 0.96),
+            borderColor: PDFLib.rgb(0, 0, 0), borderWidth: 1,
           });
         } else {
           // Render source page to canvas
@@ -584,6 +578,12 @@ document.getElementById('imposeBtn').addEventListener('click', async () => {
           sheet.drawImage(img, {
             x: cellX + offX, y: cellY + offY,
             width: drawW, height: drawH,
+          });
+
+          // Draw border on top of image so all 4 sides are fully visible
+          sheet.drawRectangle({
+            x: cellX, y: cellY, width: cellW, height: cellH,
+            borderColor: PDFLib.rgb(0, 0, 0), borderWidth: 1,
           });
         }
       }
