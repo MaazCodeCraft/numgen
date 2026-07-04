@@ -103,7 +103,7 @@ options.forEach(opt => {
     document.getElementById('pdfUploadRow').style.display = 'none';
     document.getElementById('pdfInfo').textContent = '';
     document.getElementById('pdfInput').value = '';
-    document.getElementById('reorderSection').style.display = 'none';
+    document.getElementById('pdfActions').style.display = 'none';
     uploadedPdfFile = null;
 
     if (isComingSoon) {
@@ -147,9 +147,12 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
   pdfInfo.style.color = '#6b7280';
 
   // Reset reorder section
-  document.getElementById('reorderSection').style.display = 'none';
+  document.getElementById('pdfActions').style.display = 'none';
   document.getElementById('reorderSuccess').style.display = 'none';
   document.getElementById('progressWrap').style.display = 'none';
+  document.getElementById('imposeSuccess').style.display = 'none';
+  document.getElementById('imposeProgressWrap').style.display = 'none';
+  document.getElementById('imposePreview').style.display = 'none';
 
   try {
     const arrayBuffer = await file.arrayBuffer();
@@ -238,17 +241,18 @@ document.getElementById('genBtn').addEventListener('click', () => {
   document.getElementById('statMode').textContent = selected + ' per page';
   document.getElementById('downloadPdfBtn').style.display = 'flex';
 
-  // Show reorder section only if a PDF is uploaded
-  const reorderSection = document.getElementById('reorderSection');
+  // Show actions panel only if a PDF is uploaded
   if (uploadedPdfFile) {
-    reorderSection.style.display = 'flex';
+    document.getElementById('pdfActions').style.display = 'grid';
     document.getElementById('reorderSuccess').style.display = 'none';
     document.getElementById('progressWrap').style.display = 'none';
-    const btn = document.getElementById('reorderBtn');
-    btn.disabled = false;
-    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Reordered PDF`;
+    document.getElementById('reorderBtn').disabled = false;
+    document.getElementById('imposeSuccess').style.display = 'none';
+    document.getElementById('imposeProgressWrap').style.display = 'none';
+    document.getElementById('imposePreview').style.display = 'none';
+    document.getElementById('imposeBtn').disabled = false;
   } else {
-    reorderSection.style.display = 'none';
+    document.getElementById('pdfActions').style.display = 'none';
   }
 });
 
@@ -417,5 +421,201 @@ document.getElementById('reorderBtn').addEventListener('click', async () => {
     progressWrap.style.display = 'none';
     btn.disabled = false;
     alert('Failed to reorder PDF: ' + err.message);
+  }
+});
+
+// ── Grid layouts per mode ──────────────────────────────────────────────────
+const gridMap = { '4': [2,2], '6': [3,2], '8': [4,2], '9': [3,3] };
+
+// Render one PDF.js page to an offscreen canvas at a given scale
+async function renderPageToCanvas(pdfJsDoc, pageNum, scale) {
+  const page = await pdfJsDoc.getPage(pageNum);
+  const vp = page.getViewport({ scale });
+  const canvas = document.createElement('canvas');
+  canvas.width  = Math.round(vp.width);
+  canvas.height = Math.round(vp.height);
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+  return canvas;
+}
+
+// Draw the layout preview onto the visible canvas
+function drawLayoutPreview(cols, rows, perPage) {
+  const canvas = document.getElementById('imposeCanvas');
+  const W = canvas.parentElement.clientWidth || 300;
+  // Sheet aspect: A3 landscape for multi-up
+  const sheetW = W, sheetH = Math.round(W * (cols >= rows ? 0.71 : 1.41));
+  canvas.width  = sheetW;
+  canvas.height = sheetH;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, sheetW, sheetH);
+
+  const margin = 12, gap = 4;
+  const cellW = (sheetW - margin * 2 - gap * (cols - 1)) / cols;
+  const cellH = (sheetH - margin * 2 - gap * (rows - 1)) / rows;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c;
+      const x = margin + c * (cellW + gap);
+      const y = margin + r * (cellH + gap);
+      ctx.fillStyle = idx < perPage ? '#eff6ff' : '#f3f4f6';
+      ctx.fillRect(x, y, cellW, cellH);
+      ctx.strokeStyle = '#93c5fd';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, cellW, cellH);
+      ctx.fillStyle = '#1a56db';
+      ctx.font = `bold ${Math.max(10, Math.round(cellH * 0.25))}px Inter,sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(idx + 1, x + cellW / 2, y + cellH / 2);
+    }
+  }
+}
+
+document.getElementById('imposeBtn').addEventListener('click', async () => {
+  if (!uploadedPdfFile || !lastNums.length) return;
+
+  const btn           = document.getElementById('imposeBtn');
+  const progressWrap  = document.getElementById('imposeProgressWrap');
+  const progressBar   = document.getElementById('imposeProgressBar');
+  const progressLabel = document.getElementById('imposeProgressLabel');
+  const successEl     = document.getElementById('imposeSuccess');
+  const previewEl     = document.getElementById('imposePreview');
+
+  btn.disabled = true;
+  successEl.style.display = 'none';
+  progressWrap.style.display = 'flex';
+  progressBar.style.width = '0%';
+  progressLabel.textContent = 'Loading PDF…';
+
+  try {
+    const [cols, rows] = gridMap[selected];
+    const perPage = parseInt(selected);          // pages per sheet
+    const divisor = divisorMap[selected];        // numbers per full block
+
+    // Build padded sequence (1-based page numbers; 0 = blank)
+    const sequence = [...lastNums];
+    while (sequence.length % divisor !== 0) sequence.push(0);
+    const totalSrc    = sequence.filter(n => n > 0).length > 0
+      ? Math.max(...sequence.filter(n => n > 0))
+      : 0;
+    const addedBlanks = sequence.filter(n => n === 0).length;
+    const totalSheets = sequence.length / perPage;
+
+    // Show layout preview immediately
+    drawLayoutPreview(cols, rows, perPage);
+    previewEl.style.display = 'flex';
+
+    progressLabel.textContent = 'Loading PDF…';
+    progressBar.style.width = '5%';
+    await new Promise(r => setTimeout(r, 0));
+
+    const arrayBuffer = await uploadedPdfFile.arrayBuffer();
+
+    // Load with PDF.js for rendering
+    const pdfJsDoc = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+    const srcPageCount = pdfJsDoc.numPages;
+
+    // Load with pdf-lib for output
+    const outDoc = await PDFLib.PDFDocument.create();
+
+    progressBar.style.width = '10%';
+    progressLabel.textContent = 'Imposing pages…';
+    await new Promise(r => setTimeout(r, 0));
+
+    // Output sheet size: A3 landscape for ≥4-up, portrait for 2-up
+    // We derive from first source page to preserve proportions
+    const firstSrcPage = pdfJsDoc.getPage(1);
+    const firstVp = (await firstSrcPage).getViewport({ scale: 1 });
+    const srcW = firstVp.width, srcH = firstVp.height;
+
+    // Sheet = cols*srcW × rows*srcH (plus margins/gaps in pts)
+    const MARGIN = 18, GAP = 6;
+    const sheetW = cols * srcW + (cols - 1) * GAP + MARGIN * 2;
+    const sheetH = rows * srcH + (rows - 1) * GAP + MARGIN * 2;
+    const cellW  = srcW;
+    const cellH  = srcH;
+
+    // Render scale: render at 2× for quality, then embed as PNG
+    const RENDER_SCALE = 2;
+
+    for (let s = 0; s < totalSheets; s++) {
+      const sheet = outDoc.addPage([sheetW, sheetH]);
+
+      for (let i = 0; i < perPage; i++) {
+        const seqIdx  = s * perPage + i;
+        const pageNum = sequence[seqIdx]; // 1-based or 0
+
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const cellX = MARGIN + col * (cellW + GAP);
+        // pdf-lib Y is bottom-up
+        const cellY = sheetH - MARGIN - (row + 1) * cellH - row * GAP;
+
+        // Cell border
+        sheet.drawRectangle({
+          x: cellX, y: cellY, width: cellW, height: cellH,
+          borderColor: PDFLib.rgb(0.7, 0.7, 0.7), borderWidth: 0.5,
+        });
+
+        if (pageNum === 0 || pageNum > srcPageCount) {
+          // Blank cell
+          sheet.drawRectangle({
+            x: cellX + 0.5, y: cellY + 0.5,
+            width: cellW - 1, height: cellH - 1,
+            color: PDFLib.rgb(0.96, 0.96, 0.96),
+          });
+        } else {
+          // Render source page to canvas
+          const srcCanvas = await renderPageToCanvas(pdfJsDoc, pageNum, RENDER_SCALE);
+          const pngBytes  = await new Promise(res => srcCanvas.toBlob(b => b.arrayBuffer().then(res), 'image/png'));
+          const img       = await outDoc.embedPng(pngBytes);
+
+          // Scale to fit cell proportionally
+          const scaleX = cellW  / img.width  * RENDER_SCALE;
+          const scaleY = cellH  / img.height * RENDER_SCALE;
+          const scale  = Math.min(scaleX, scaleY);
+          const drawW  = img.width  / RENDER_SCALE * scale;
+          const drawH  = img.height / RENDER_SCALE * scale;
+          const offX   = (cellW  - drawW) / 2;
+          const offY   = (cellH  - drawH) / 2;
+
+          sheet.drawImage(img, {
+            x: cellX + offX, y: cellY + offY,
+            width: drawW, height: drawH,
+          });
+        }
+      }
+
+      // Yield every sheet for UI responsiveness
+      progressBar.style.width = (10 + Math.round((s / totalSheets) * 82)) + '%';
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    progressLabel.textContent = 'Saving…';
+    progressBar.style.width = '95%';
+    await new Promise(r => setTimeout(r, 0));
+
+    const pdfBytes = await outDoc.save();
+    progressBar.style.width = '100%';
+
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = uploadedPdfFile.name.replace(/\.pdf$/i, '') + `-imposed-${selected}up.pdf`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    document.getElementById('imposeMsg').textContent =
+      `Done! ${totalSheets} sheet${totalSheets !== 1 ? 's' : ''} · ${sequence.length} pages total` +
+      (addedBlanks > 0 ? ` · ${addedBlanks} blank page${addedBlanks !== 1 ? 's' : ''} added` : '');
+    successEl.style.display = 'flex';
+    progressWrap.style.display = 'none';
+    btn.disabled = false;
+  } catch (err) {
+    document.getElementById('imposeProgressWrap').style.display = 'none';
+    btn.disabled = false;
+    alert('Failed to generate imposed PDF: ' + err.message);
   }
 });

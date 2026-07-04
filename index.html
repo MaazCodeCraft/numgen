@@ -109,20 +109,54 @@
       </div>
     </div>
 
-    <!-- PDF Reorder Section -->
-    <div class="reorder-section" id="reorderSection" style="display:none;">
-      <div class="progress-wrap" id="progressWrap" style="display:none;">
-        <div class="progress-label" id="progressLabel">Processing PDF…</div>
-        <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
+    <!-- PDF Actions Section -->
+    <div class="pdf-actions" id="pdfActions" style="display:none;">
+
+      <!-- Reorder Card -->
+      <div class="action-card" id="reorderSection">
+        <div class="action-card-header">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          <span>Reorder PDF</span>
+        </div>
+        <div class="progress-wrap" id="progressWrap" style="display:none;">
+          <div class="progress-label" id="progressLabel">Processing PDF…</div>
+          <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
+        </div>
+        <div class="action-success" id="reorderSuccess" style="display:none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <span id="reorderMsg"></span>
+        </div>
+        <button class="action-btn action-btn--blue" id="reorderBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download Reordered PDF
+        </button>
       </div>
-      <div class="reorder-success" id="reorderSuccess" style="display:none;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        <span id="reorderMsg"></span>
+
+      <!-- Impose Card -->
+      <div class="action-card" id="imposeSection">
+        <div class="action-card-header">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <span>Generate Printable Imposed PDF</span>
+        </div>
+        <div class="progress-wrap" id="imposeProgressWrap" style="display:none;">
+          <div class="progress-label" id="imposeProgressLabel">Processing…</div>
+          <div class="progress-track"><div class="progress-bar progress-bar--purple" id="imposeProgressBar"></div></div>
+        </div>
+        <div class="action-success" id="imposeSuccess" style="display:none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <span id="imposeMsg"></span>
+        </div>
+        <!-- Layout Preview -->
+        <div class="impose-preview" id="imposePreview" style="display:none;">
+          <div class="impose-preview-label">Sheet Layout Preview</div>
+          <canvas id="imposeCanvas"></canvas>
+        </div>
+        <button class="action-btn action-btn--purple" id="imposeBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Generate Printable PDF
+        </button>
       </div>
-      <button class="reorder-btn" id="reorderBtn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Download Reordered PDF
-      </button>
+
     </div>
 
     <!-- Info Tooltip -->
