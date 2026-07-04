@@ -2,36 +2,204 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Number Pattern Generator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Page Pattern Generator</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <h1>Number Pattern Generator</h1>
-  <p class="subtitle">Generates a structured number pattern based on your input</p>
+<div class="app">
 
-  <div class="input-area">
-    <input type="number" id="numInput" placeholder="Enter a number (e.g. 1000)" min="1" />
-    <button class="generate-btn" onclick="generate()">Generate</button>
-  </div>
-
-  <div class="output-wrapper" id="outputWrapper">
-    <div class="output-header">
-      <span id="outputLabel">Pattern output</span>
-      <button class="copy-btn" onclick="copyOutput()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="9" y="9" width="13" height="13" rx="2"/>
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-        </svg>
-        Copy
-      </button>
+  <!-- Blue Banner Header -->
+  <div class="banner">
+    <div class="banner-icon">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
     </div>
-    <div id="output"></div>
+    <div>
+      <div class="banner-title">Page Pattern Generator</div>
+      <div class="banner-sub">Generate number pattern based on per page selection</div>
+    </div>
   </div>
 
-  <div class="toast" id="toast">✓ Copied to clipboard!</div>
+  <!-- Body -->
+  <div class="body">
 
-  <script src="script.js"></script>
+    <!-- Controls Row -->
+    <div class="controls-row">
+
+      <!-- Custom Dropdown -->
+      <div class="field dropdown-field">
+        <label>Per Page</label>
+        <div class="custom-select" id="customSelect">
+          <div class="select-trigger" id="selectTrigger">
+            <span id="selectLabel">Select an option</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="select-dropdown" id="selectDropdown">
+            <div class="select-option" data-value="4">4 Per Page</div>
+            <div class="select-option" data-value="6">6 Per Page</div>
+            <div class="select-option" data-value="8">8 Per Page</div>
+            <div class="select-option" data-value="9">9 Per Page</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Number Input -->
+      <div class="field number-field" id="limitField" style="visibility:hidden">
+        <label for="limit">Enter Last Number</label>
+        <input type="number" id="limit" min="1" value="1000" placeholder="1000" onkeydown="if(event.key==='Enter') document.getElementById('genBtn').click()" />
+        <div class="hint">Example: 1000</div>
+      </div>
+
+      <!-- Generate Button -->
+      <div class="field btn-field" id="btnField" style="visibility:hidden">
+        <label>&nbsp;</label>
+        <button class="generate" id="genBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+          Generate
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Coming Soon Banner -->
+    <div class="coming-soon" id="comingSoon">🚧 This mode is coming soon! Stay tuned.</div>
+
+    <!-- Output Section -->
+    <div class="output-wrapper" id="outputWrapper">
+      <div class="output-topbar">
+        <h2 id="title"></h2>
+        <button class="copy-btn" id="copyBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          <span>Copy</span>
+        </button>
+      </div>
+      <div class="output-box">
+        <div class="output" id="output"></div>
+      </div>
+    </div>
+
+    <!-- Info Box -->
+    <div class="info-box" id="infoBox">
+      <div class="info-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="#1d4ed8" stroke="none"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+      </div>
+      <div class="info-text">
+        <strong>Pattern Logic:</strong><br/>
+        <span><strong>6 Per Page:</strong> Odd numbers ascending, then even numbers descending in a special order (6,4,2,12,10,8 …).</span><br/>
+        <span><strong>4 Per Page:</strong> Odd numbers ascending, then even numbers descending in a special order (4,2,8,6 …).</span><br/>
+        <span><strong>8 Per Page:</strong> Odd numbers ascending, then even numbers descending in a special order (8,6,4,2,16,14,12,10 …).</span><br/>
+        <span><strong>9 Per Page:</strong> Odd numbers ascending, then even numbers descending in a special order (6,4,2,12,10,8,18,16,14 …).</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="script.js"></script>
+<script>
+  // Custom dropdown logic (UI only — bridges to script.js via modeEl proxy)
+  const trigger = document.getElementById('selectTrigger');
+  const dropdown = document.getElementById('selectDropdown');
+  const selectLabel = document.getElementById('selectLabel');
+  const options = document.querySelectorAll('.select-option');
+  const limitField = document.getElementById('limitField');
+  const btnField = document.getElementById('btnField');
+  const comingSoon = document.getElementById('comingSoon');
+  const outputWrapper = document.getElementById('outputWrapper');
+  const titleEl = document.getElementById('title');
+  const infoBox = document.getElementById('infoBox');
+
+  // Hidden native select to reuse script.js logic
+  const nativeSelect = document.createElement('select');
+  nativeSelect.id = 'mode';
+  nativeSelect.style.display = 'none';
+  ['', '4', '6', '8', '9'].forEach(v => {
+    const o = document.createElement('option');
+    o.value = v;
+    nativeSelect.appendChild(o);
+  });
+  document.body.appendChild(nativeSelect);
+
+  let selected = null;
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle('open');
+    trigger.classList.toggle('active');
+  });
+
+  document.addEventListener('click', () => {
+    dropdown.classList.remove('open');
+    trigger.classList.remove('active');
+  });
+
+  options.forEach(opt => {
+    opt.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const val = opt.dataset.value;
+      const isComingSoon = opt.classList.contains('coming');
+
+      // Clear previous selection
+      options.forEach(o => o.classList.remove('selected'));
+      dropdown.classList.remove('open');
+      trigger.classList.remove('active');
+      outputWrapper.style.display = 'none';
+
+      if (isComingSoon) {
+        selectLabel.textContent = opt.childNodes[0].textContent.trim();
+        selected = null;
+        comingSoon.classList.add('visible');
+        limitField.style.visibility = 'hidden';
+        btnField.style.visibility = 'hidden';
+        titleEl.textContent = '';
+        return;
+      }
+
+      opt.classList.add('selected');
+      selected = val;
+      selectLabel.textContent = val + ' Per Page';
+      comingSoon.classList.remove('visible');
+      limitField.style.visibility = 'visible';
+      btnField.style.visibility = 'visible';
+      titleEl.textContent = val + ' Per Page';
+
+      // Sync to native select so script.js genBtn click works
+      nativeSelect.value = val;
+    });
+  });
+
+  // Wire Generate button
+  document.getElementById('genBtn').addEventListener('click', () => {
+    if (!selected) return;
+    const max = parseInt(document.getElementById('limit').value);
+    if (!max || max < 1) { alert('Please enter a valid maximum number.'); return; }
+
+    const nums = selected === '4' ? generate4(max) : selected === '8' ? generate8(max) : selected === '9' ? generate9(max) : generate6(max);
+    document.getElementById('output').textContent = nums.join(', ');
+    outputWrapper.style.display = 'block';
+    infoBox.style.display = 'flex';
+  });
+
+  // Copy button
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    const text = document.getElementById('output').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copyBtn');
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied!';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.querySelector('span').textContent = 'Copy';
+      }, 2000);
+    });
+  });
+</script>
 </body>
 </html>
