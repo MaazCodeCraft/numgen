@@ -25,11 +25,58 @@ document.body.appendChild(nativeSelect);
 
 let selected = null;
 
+// Make trigger focusable
+trigger.setAttribute('tabindex', '0');
+
 trigger.addEventListener('click', (e) => {
   e.stopPropagation();
   dropdown.classList.toggle('open');
   trigger.classList.toggle('active');
 });
+
+// Open dropdown with Space/Enter, navigate with arrows, close with Escape
+trigger.addEventListener('keydown', (e) => {
+  const optList = Array.from(options);
+  const isOpen = dropdown.classList.contains('open');
+  const focusedIndex = optList.findIndex(o => o.classList.contains('focused'));
+
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    if (!isOpen) {
+      dropdown.classList.add('open');
+      trigger.classList.add('active');
+      const selectedIdx = optList.findIndex(o => o.classList.contains('selected'));
+      setFocused(optList, selectedIdx >= 0 ? selectedIdx : 0);
+    } else {
+      if (focusedIndex >= 0) optList[focusedIndex].click();
+    }
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (!isOpen) { dropdown.classList.add('open'); trigger.classList.add('active'); }
+    setFocused(optList, Math.min(focusedIndex + 1, optList.length - 1));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!isOpen) { dropdown.classList.add('open'); trigger.classList.add('active'); }
+    setFocused(optList, Math.max(focusedIndex - 1, 0));
+  } else if (e.key === 'Escape') {
+    dropdown.classList.remove('open');
+    trigger.classList.remove('active');
+    clearFocused(optList);
+  } else if (e.key === 'Tab') {
+    dropdown.classList.remove('open');
+    trigger.classList.remove('active');
+    clearFocused(optList);
+  }
+});
+
+function setFocused(optList, index) {
+  clearFocused(optList);
+  if (index >= 0 && index < optList.length) optList[index].classList.add('focused');
+}
+
+function clearFocused(optList) {
+  optList.forEach(o => o.classList.remove('focused'));
+}
 
 document.addEventListener('click', () => {
   dropdown.classList.remove('open');

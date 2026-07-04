@@ -104,7 +104,8 @@ label {
 }
 
 .select-trigger.active,
-.select-trigger:hover { box-shadow: 0 0 0 3px rgba(26,86,219,0.15); }
+.select-trigger:hover,
+.select-trigger:focus { box-shadow: 0 0 0 3px rgba(26,86,219,0.15); outline: none; }
 
 .select-trigger svg { transition: transform 0.2s; flex-shrink: 0; }
 .select-trigger.active svg { transform: rotate(180deg); }
@@ -136,7 +137,7 @@ label {
   transition: background 0.15s;
 }
 
-.select-option:hover { background: #f3f4f6; }
+.select-option:hover, .select-option.focused { background: #f3f4f6; }
 
 .select-option.selected {
   color: #1a56db;
