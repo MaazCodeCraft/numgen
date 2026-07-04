@@ -83,6 +83,11 @@
       <div class="output-box">
         <div class="output" id="output"></div>
       </div>
+      <div class="stats-bar" id="statsBar">
+        <div class="stat"><span class="stat-label">Total Numbers</span><span class="stat-value" id="statTotal">—</span></div>
+        <div class="stat"><span class="stat-label">Total Pages</span><span class="stat-value" id="statPages">—</span></div>
+        <div class="stat"><span class="stat-label">Per Page</span><span class="stat-value" id="statMode">—</span></div>
+      </div>
     </div>
 
     <!-- Info Box -->
@@ -185,6 +190,9 @@
     document.getElementById('output').textContent = nums.join(', ');
     outputWrapper.style.display = 'block';
     infoBox.style.display = 'flex';
+    document.getElementById('statTotal').textContent = nums.length.toLocaleString();
+    document.getElementById('statPages').textContent = Math.ceil(nums.length / parseInt(selected)).toLocaleString();
+    document.getElementById('statMode').textContent = selected + ' per page';
   });
 
   // Copy button
