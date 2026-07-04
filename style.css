@@ -290,7 +290,7 @@ button.generate:active { transform: translateY(0); }
 
 .flash-red .banner {
   animation: flashRedBanner 0.8s ease infinite;
-  animation-delay: 3s;
+  animation-delay: 1s;
   background: #1a56db;
 }
 
