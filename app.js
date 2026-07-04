@@ -103,6 +103,8 @@ options.forEach(opt => {
     document.getElementById('pdfUploadRow').style.display = 'none';
     document.getElementById('pdfInfo').textContent = '';
     document.getElementById('pdfInput').value = '';
+    document.getElementById('reorderSection').style.display = 'none';
+    uploadedPdfFile = null;
 
     if (isComingSoon) {
       selectLabel.textContent = opt.childNodes[0].textContent.trim();
@@ -144,6 +146,11 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
   pdfInfo.textContent = 'Reading PDF...';
   pdfInfo.style.color = '#6b7280';
 
+  // Reset reorder section
+  document.getElementById('reorderSection').style.display = 'none';
+  document.getElementById('reorderSuccess').style.display = 'none';
+  document.getElementById('progressWrap').style.display = 'none';
+
   try {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -152,6 +159,9 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
     pdfLabel.textContent = file.name;
     pdfInfo.textContent = `✓ ${pageCount} pages detected — input auto-filled`;
     pdfInfo.style.color = '#059669';
+
+    // Auto-generate pattern if mode already selected
+    if (selected) document.getElementById('genBtn').click();
   } catch {
     pdfInfo.textContent = 'Failed to read PDF. Please try another file.';
     pdfInfo.style.color = '#dc2626';
@@ -227,6 +237,19 @@ document.getElementById('genBtn').addEventListener('click', () => {
   document.getElementById('statPages').textContent = Math.ceil(lastNums.length / parseInt(selected)).toLocaleString();
   document.getElementById('statMode').textContent = selected + ' per page';
   document.getElementById('downloadPdfBtn').style.display = 'flex';
+
+  // Show reorder section only if a PDF is uploaded
+  const reorderSection = document.getElementById('reorderSection');
+  if (uploadedPdfFile) {
+    reorderSection.style.display = 'flex';
+    document.getElementById('reorderSuccess').style.display = 'none';
+    document.getElementById('progressWrap').style.display = 'none';
+    const btn = document.getElementById('reorderBtn');
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Reordered PDF`;
+  } else {
+    reorderSection.style.display = 'none';
+  }
 });
 
 document.getElementById('downloadPdfBtn').addEventListener('click', async () => {
@@ -312,4 +335,87 @@ document.getElementById('copyBtn').addEventListener('click', () => {
       btn.querySelector('span').textContent = 'Copy';
     }, 2000);
   });
+});
+
+document.getElementById('reorderBtn').addEventListener('click', async () => {
+  if (!uploadedPdfFile || !lastNums.length) return;
+
+  const btn = document.getElementById('reorderBtn');
+  const progressWrap = document.getElementById('progressWrap');
+  const progressBar = document.getElementById('progressBar');
+  const progressLabel = document.getElementById('progressLabel');
+  const reorderSuccess = document.getElementById('reorderSuccess');
+
+  btn.disabled = true;
+  progressWrap.style.display = 'flex';
+  reorderSuccess.style.display = 'none';
+  progressBar.style.width = '0%';
+  progressLabel.textContent = 'Loading PDF…';
+
+  try {
+    const arrayBuffer = await uploadedPdfFile.arrayBuffer();
+    const srcDoc = await PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+    const totalSrc = srcDoc.getPageCount();
+    const divisor = divisorMap[selected];
+
+    // Build padded sequence: lastNums uses 1-based page numbers; pad to divisor multiple
+    const sequence = [...lastNums];
+    while (sequence.length % divisor !== 0) sequence.push(0); // 0 = blank
+    const blankCount = sequence.filter(n => n === 0 || n > totalSrc).length;
+    const finalCount = sequence.length;
+
+    progressLabel.textContent = 'Reordering pages…';
+    progressBar.style.width = '10%';
+
+    const outDoc = await PDFLib.PDFDocument.create();
+
+    // Copy all source pages once for embedding
+    const allPageIndices = Array.from({ length: totalSrc }, (_, i) => i);
+    const copiedPages = await outDoc.copyPages(srcDoc, allPageIndices);
+
+    progressBar.style.width = '50%';
+
+    // Get first page size for blank pages
+    const { width: blankW, height: blankH } = srcDoc.getPage(0).getSize();
+
+    const chunkSize = 100;
+    for (let i = 0; i < sequence.length; i++) {
+      const pageNum = sequence[i]; // 1-based; 0 = blank
+      if (pageNum === 0 || pageNum > totalSrc) {
+        outDoc.addPage([blankW, blankH]);
+      } else {
+        outDoc.addPage(copiedPages[pageNum - 1]);
+      }
+      // Yield to browser every chunkSize pages to keep UI responsive
+      if (i % chunkSize === 0) {
+        progressBar.style.width = (50 + Math.round((i / sequence.length) * 45)) + '%';
+        await new Promise(r => setTimeout(r, 0));
+      }
+    }
+
+    progressLabel.textContent = 'Saving PDF…';
+    progressBar.style.width = '95%';
+    await new Promise(r => setTimeout(r, 0));
+
+    const pdfBytes = await outDoc.save();
+    progressBar.style.width = '100%';
+
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = uploadedPdfFile.name.replace(/\.pdf$/i, '') + '-reordered.pdf';
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    const addedBlanks = sequence.filter(n => n === 0 || n > totalSrc).length;
+    document.getElementById('reorderMsg').textContent =
+      `Done! ${finalCount} pages total — ${addedBlanks > 0 ? addedBlanks + ' blank page(s) added' : 'no blank pages needed'}.`;
+    reorderSuccess.style.display = 'flex';
+    progressWrap.style.display = 'none';
+    btn.disabled = false;
+  } catch (err) {
+    progressWrap.style.display = 'none';
+    btn.disabled = false;
+    alert('Failed to reorder PDF: ' + err.message);
+  }
 });
