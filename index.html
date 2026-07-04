@@ -50,8 +50,8 @@
       <!-- Number Input -->
       <div class="field number-field" id="limitField" style="visibility:hidden">
         <label for="limit">Enter Last Number</label>
-        <input type="number" id="limit" min="1" value="1000" placeholder="1000" onkeydown="if(event.key==='Enter') document.getElementById('genBtn').click()" />
-        <div class="hint">Example: 1000</div>
+        <input type="number" id="limit" min="1" placeholder="e.g. 1000" onkeydown="if(event.key==='Enter') document.getElementById('genBtn').click()" />
+
       </div>
 
       <!-- Generate Button -->
@@ -67,6 +67,9 @@
 
     <!-- Coming Soon Banner -->
     <div class="coming-soon" id="comingSoon">🚧 This mode is coming soon! Stay tuned.</div>
+
+    <!-- Validation Message -->
+    <div id="validationMsg" style="display:none; margin: 12px 0; padding: 10px 14px; border-radius: 8px; font-size: 14px; font-weight: 500;"></div>
 
     <!-- Output Section -->
     <div class="output-wrapper" id="outputWrapper">
@@ -90,15 +93,15 @@
       </div>
     </div>
 
-    <!-- Info Box -->
-    <div class="info-box" id="infoBox">
-      <div class="info-icon">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="#1d4ed8" stroke="none"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+    <!-- Info Tooltip -->
+    <div class="info-tooltip-wrap" id="infoBox">
+      <div class="info-icon-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#1d4ed8" stroke="none"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
       </div>
-      <div class="info-text">
+      <div class="info-tooltip">
         <strong>Pattern Logic:</strong><br/>
-        <span><strong>6 Per Page:</strong> Odd numbers ascending, then even numbers descending in a special order (6,4,2,12,10,8 …).</span><br/>
         <span><strong>4 Per Page:</strong> Odd numbers ascending, then even numbers descending in a special order (4,2,8,6 …).</span><br/>
+        <span><strong>6 Per Page:</strong> Odd numbers ascending, then even numbers descending in a special order (6,4,2,12,10,8 …).</span><br/>
         <span><strong>8 Per Page:</strong> Odd numbers ascending, then even numbers descending in a special order (8,6,4,2,16,14,12,10 …).</span><br/>
         <span><strong>9 Per Page:</strong> Odd numbers ascending, then even numbers descending in a special order (6,4,2,12,10,8,18,16,14 …).</span>
       </div>
@@ -156,6 +159,12 @@
       dropdown.classList.remove('open');
       trigger.classList.remove('active');
       outputWrapper.style.display = 'none';
+      const msgEl = document.getElementById('validationMsg');
+      msgEl.style.display = 'none';
+      msgEl.className = '';
+      msgEl.textContent = '';
+      document.body.classList.remove('flash-red');
+      document.getElementById('limit').value = '';
 
       if (isComingSoon) {
         selectLabel.textContent = opt.childNodes[0].textContent.trim();
@@ -180,16 +189,44 @@
     });
   });
 
+  const divisorMap = { '4': 8, '6': 12, '8': 16, '9': 18 };
+
+  function showValidation(max, mode) {
+    const msgEl = document.getElementById('validationMsg');
+    const divisor = divisorMap[mode];
+    const remainder = max % divisor;
+    if (remainder === 0) {
+      document.body.classList.remove('flash-red');
+      msgEl.className = 'msg-perfect';
+      msgEl.textContent = 'Perfect! The number is perfectly divisible.';
+      msgEl.style.display = 'block';
+    } else {
+      const needed = divisor - remainder;
+      const extraPages = needed / parseInt(mode);
+      const pagesText = Number.isInteger(extraPages)
+        ? `Add ${needed} more number${needed > 1 ? 's' : ''} (${extraPages} more page${extraPages > 1 ? 's' : ''}) to complete the last page.`
+        : `Add ${needed} more number${needed > 1 ? 's' : ''} to complete the last page.`;
+      msgEl.className = 'msg-warning';
+      msgEl.textContent = `Warning: Not perfectly divisible. ${pagesText}`;
+      msgEl.style.display = 'block';
+      document.body.classList.remove('flash-red');
+      void document.body.offsetWidth;
+      document.body.classList.add('flash-red');
+    }
+  }
+
   // Wire Generate button
   document.getElementById('genBtn').addEventListener('click', () => {
     if (!selected) return;
     const max = parseInt(document.getElementById('limit').value);
     if (!max || max < 1) { alert('Please enter a valid maximum number.'); return; }
 
+    showValidation(max, selected);
+
     const nums = selected === '4' ? generate4(max) : selected === '8' ? generate8(max) : selected === '9' ? generate9(max) : generate6(max);
     document.getElementById('output').textContent = nums.join(', ');
     outputWrapper.style.display = 'block';
-    infoBox.style.display = 'flex';
+    infoBox.style.display = 'block';
     document.getElementById('statTotal').textContent = nums.length.toLocaleString();
     document.getElementById('statPages').textContent = Math.ceil(nums.length / parseInt(selected)).toLocaleString();
     document.getElementById('statMode').textContent = selected + ' per page';

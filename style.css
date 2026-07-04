@@ -283,26 +283,80 @@ button.generate:active { transform: translateY(0); }
 .output::-webkit-scrollbar-track { background: #f1f5f9; }
 .output::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 
-/* ── Info Box ── */
-.info-box {
-  display: none;
-  align-items: flex-start;
-  gap: 12px;
-  background: #eff6ff;
-  border: 1.5px solid #bfdbfe;
-  border-radius: 8px;
-  padding: 14px 16px;
+@keyframes flashRedBanner {
+  0%, 100% { background: #1a56db; }
+  50% { background: #ef4444; }
 }
 
-.info-icon { flex-shrink: 0; margin-top: 2px; }
+.flash-red .banner {
+  animation: flashRedBanner 0.8s ease infinite;
+  animation-delay: 3s;
+  background: #1a56db;
+}
 
-.info-text {
+.msg-perfect {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.msg-perfect::before {
+  content: '✓ ';
+  font-weight: 700;
+}
+
+.msg-warning {
+  background: #fef9c3;
+  color: #854d0e;
+  border: 1px solid #fde047;
+}
+
+.msg-warning::before {
+  content: '! ';
+  font-weight: 700;
+}
+
+/* ── Info Tooltip ── */
+.info-tooltip-wrap {
+  display: none;
+  position: relative;
+  width: fit-content;
+  margin-top: 16px;
+}
+
+.info-icon-btn {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+
+.info-icon-btn:hover { background: #dbeafe; }
+
+.info-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 340px;
+  background: #fff;
+  border: 1.5px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 14px 16px;
   font-size: 0.82rem;
   color: #1e40af;
   line-height: 1.7;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+  z-index: 300;
 }
 
-.info-text strong { font-weight: 700; }
+.info-tooltip strong { font-weight: 700; }
+
+.info-tooltip-wrap:hover .info-tooltip { display: block; }
 
 /* ── Stats Bar ── */
 .stats-bar {
