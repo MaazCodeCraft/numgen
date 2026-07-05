@@ -158,9 +158,15 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     const pageCount = pdf.numPages;
-    document.getElementById('limit').value = pageCount;
+    const divisor = selected ? divisorMap[selected] : null;
+    const adjustedCount = divisor && pageCount % divisor !== 0
+      ? pageCount + (divisor - (pageCount % divisor))
+      : pageCount;
+    document.getElementById('limit').value = adjustedCount;
     pdfLabel.textContent = file.name;
-    pdfInfo.textContent = `✓ ${pageCount} pages detected — input auto-filled`;
+    pdfInfo.textContent = adjustedCount !== pageCount
+      ? `✓ ${pageCount} pages detected — auto-adjusted to ${adjustedCount} (rounded up to complete last page)`
+      : `✓ ${pageCount} pages detected — input auto-filled`;
     pdfInfo.style.color = '#059669';
 
     // Auto-generate pattern if mode already selected
@@ -202,18 +208,38 @@ function showValidation(max, mode) {
         return;
       }
       try {
+        // Step 1: add blank pages to make count divisible
         const arrayBuffer = await uploadedPdfFile.arrayBuffer();
-        const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
-        const firstPage = pdfDoc.getPage(0);
-        const { width, height } = firstPage.getSize();
-        for (let i = 0; i < needed; i++) {
-          pdfDoc.addPage([width, height]);
+        const srcDoc = await PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+        const { width: blankW, height: blankH } = srcDoc.getPage(0).getSize();
+        for (let i = 0; i < needed; i++) srcDoc.addPage([blankW, blankH]);
+        const paddedBytes = await srcDoc.save();
+
+        // Step 2: reload padded doc and reorder using the pattern
+        const paddedDoc = await PDFLib.PDFDocument.load(paddedBytes, { ignoreEncryption: true });
+        const totalSrc = paddedDoc.getPageCount();
+
+        // Regenerate sequence from current lastNums padded to divisor
+        const sequence = [...lastNums];
+        while (sequence.length % divisorMap[mode] !== 0) sequence.push(0);
+
+        const outDoc = await PDFLib.PDFDocument.create();
+        const allIndices = Array.from({ length: totalSrc }, (_, i) => i);
+        const copiedPages = await outDoc.copyPages(paddedDoc, allIndices);
+
+        for (const pageNum of sequence) {
+          if (pageNum === 0 || pageNum > totalSrc) {
+            outDoc.addPage([blankW, blankH]);
+          } else {
+            outDoc.addPage(copiedPages[pageNum - 1]);
+          }
         }
-        const pdfBytes = await pdfDoc.save();
+
+        const pdfBytes = await outDoc.save();
         const blob = new Blob([pdfBytes], { type: 'application/pdf' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = uploadedPdfFile.name.replace('.pdf', '') + '-with-blanks.pdf';
+        a.download = uploadedPdfFile.name.replace(/\.pdf$/i, '') + '-reordered.pdf';
         a.click();
         URL.revokeObjectURL(a.href);
       } catch {
@@ -276,19 +302,19 @@ document.getElementById('downloadPdfBtn').addEventListener('click', async () => 
     // Layout grid based on perPage
     const cols = perPage <= 4 ? 2 : perPage <= 6 ? 2 : perPage <= 8 ? 2 : 3;
     const rows = Math.ceil(perPage / cols);
-    const cellW = (pageW - 80) / cols;
-    const cellH = (pageH - 80) / rows;
+    const cellW = (pageW - 110) / cols;
+    const cellH = (pageH - 110) / rows;
 
     pageNums.forEach((num, idx) => {
       const col = idx % cols;
       const row = Math.floor(idx / cols);
-      const x = 40 + col * cellW + cellW / 2;
-      const y = pageH - 40 - row * cellH - cellH / 2;
+      const x = 55 + col * cellW + cellW / 2;
+      const y = pageH - 55 - row * cellH - cellH / 2;
 
       // Cell border
       page.drawRectangle({
-        x: 40 + col * cellW,
-        y: pageH - 40 - (row + 1) * cellH,
+        x: 55 + col * cellW,
+        y: pageH - 55 - (row + 1) * cellH,
         width: cellW,
         height: cellH,
         borderColor: rgb(0.8, 0.8, 0.8),
@@ -298,8 +324,8 @@ document.getElementById('downloadPdfBtn').addEventListener('click', async () => 
       if (num === '') {
         // Blank cell — light gray fill
         page.drawRectangle({
-          x: 40 + col * cellW + 1,
-          y: pageH - 40 - (row + 1) * cellH + 1,
+          x: 55 + col * cellW + 1,
+          y: pageH - 55 - (row + 1) * cellH + 1,
           width: cellW - 2,
           height: cellH - 2,
           color: rgb(0.95, 0.95, 0.95),
@@ -439,10 +465,9 @@ async function renderPageToCanvas(pdfJsDoc, pageNum, scale) {
 }
 
 // Draw the layout preview onto the visible canvas
-function drawLayoutPreview(cols, rows, perPage) {
+function drawLayoutPreview(cols, rows, perPage, firstSheetNums) {
   const canvas = document.getElementById('imposeCanvas');
   const W = canvas.parentElement.clientWidth || 300;
-  // Sheet aspect: A3 landscape for multi-up
   const sheetW = W, sheetH = Math.round(W * (cols >= rows ? 0.71 : 1.41));
   canvas.width  = sheetW;
   canvas.height = sheetH;
@@ -459,16 +484,18 @@ function drawLayoutPreview(cols, rows, perPage) {
       const idx = r * cols + c;
       const x = margin + c * (cellW + gap);
       const y = margin + r * (cellH + gap);
-      ctx.fillStyle = idx < perPage ? '#eff6ff' : '#f3f4f6';
+      const pageNum = firstSheetNums[idx];
+      const isBlank = !pageNum || pageNum === 0;
+      ctx.fillStyle = isBlank ? '#f3f4f6' : '#eff6ff';
       ctx.fillRect(x, y, cellW, cellH);
       ctx.strokeStyle = '#93c5fd';
       ctx.lineWidth = 1;
       ctx.strokeRect(x, y, cellW, cellH);
-      ctx.fillStyle = '#1a56db';
+      ctx.fillStyle = isBlank ? '#9ca3af' : '#1a56db';
       ctx.font = `bold ${Math.max(10, Math.round(cellH * 0.25))}px Inter,sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(idx + 1, x + cellW / 2, y + cellH / 2);
+      ctx.fillText(isBlank ? '—' : pageNum, x + cellW / 2, y + cellH / 2);
     }
   }
 }
@@ -503,8 +530,9 @@ document.getElementById('imposeBtn').addEventListener('click', async () => {
     const addedBlanks = sequence.filter(n => n === 0).length;
     const totalSheets = sequence.length / perPage;
 
-    // Show layout preview immediately
-    drawLayoutPreview(cols, rows, perPage);
+    // Show layout preview immediately with actual first-sheet page numbers
+    const firstSheetNums = sequence.slice(0, perPage);
+    drawLayoutPreview(cols, rows, perPage, firstSheetNums);
     previewEl.style.display = 'flex';
 
     progressLabel.textContent = 'Loading PDF…';
@@ -531,14 +559,14 @@ document.getElementById('imposeBtn').addEventListener('click', async () => {
     const srcW = firstVp.width, srcH = firstVp.height;
 
     // Sheet = cols*srcW × rows*srcH (plus margins/gaps in pts)
-    const MARGIN = 18, GAP = 6;
+    const MARGIN = 20, GAP = 25;
     const sheetW = cols * srcW + (cols - 1) * GAP + MARGIN * 2;
     const sheetH = rows * srcH + (rows - 1) * GAP + MARGIN * 2;
     const cellW  = srcW;
     const cellH  = srcH;
 
     // Render scale: render at 2× for quality, then embed as PNG
-    const RENDER_SCALE = 2;
+    const RENDER_SCALE = 4;
 
     for (let s = 0; s < totalSheets; s++) {
       const sheet = outDoc.addPage([sheetW, sheetH]);

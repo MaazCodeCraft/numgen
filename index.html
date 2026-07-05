@@ -9,6 +9,25 @@
 </head>
 <body>
 
+<!-- Password Gate -->
+<div id="passwordGate" style="position:fixed;inset:0;background:#eef2f7;display:flex;align-items:center;justify-content:center;z-index:9999;">
+  <div style="background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.10);padding:40px 36px;width:100%;max-width:360px;display:flex;flex-direction:column;gap:20px;">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+      <div style="width:52px;height:52px;background:#1a56db;border-radius:12px;display:flex;align-items:center;justify-content:center;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div style="font-size:1.2rem;font-weight:700;color:#111827;">Enter Password</div>
+      <div style="font-size:0.85rem;color:#6b7280;">This page is password protected</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <input id="pwInput" type="password" placeholder="Password" style="padding:11px 14px;border:1.5px solid #d1d5db;border-radius:8px;font-size:0.95rem;font-family:inherit;color:#111827;outline:none;" />
+      <div id="pwError" style="display:none;font-size:0.82rem;color:#dc2626;font-weight:500;">Incorrect password. Try again.</div>
+    </div>
+    <button id="pwBtn" style="padding:11px;background:#1a56db;color:#fff;font-size:0.95rem;font-weight:600;font-family:inherit;border:none;border-radius:8px;cursor:pointer;">Unlock</button>
+  </div>
+</div>
+
+<div id="mainApp" style="display:none;">
 <div class="app">
 
   <!-- Blue Banner Header -->
@@ -175,10 +194,34 @@
 
   </div>
 </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="script.js"></script>
 <script src="app.js"></script>
+<script>
+(async () => {
+  const HASH = '3d60306cda4e8954c88c5db2a07d6ab1051c7d7e0dc6d95257869d90a137d665';
+  async function sha256(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+  async function tryUnlock() {
+    const val = document.getElementById('pwInput').value;
+    const errEl = document.getElementById('pwError');
+    if (await sha256(val) === HASH) {
+      document.getElementById('passwordGate').style.display = 'none';
+      document.getElementById('mainApp').style.display = 'block';
+    } else {
+      errEl.style.display = 'block';
+      document.getElementById('pwInput').value = '';
+      document.getElementById('pwInput').focus();
+    }
+  }
+  document.getElementById('pwBtn').addEventListener('click', tryUnlock);
+  document.getElementById('pwInput').addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
+})();
+</script>
 </body>
 </html>
