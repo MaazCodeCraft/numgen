@@ -136,6 +136,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 
 document.getElementById('addPatternNumChk').addEventListener('change', function () {
   document.getElementById('patternNumOptions').style.display = this.checked ? 'flex' : 'none';
+  document.getElementById('addPageNumBtn').disabled = !this.checked;
 });
 
 let uploadedPdfFile = null;
@@ -763,4 +764,45 @@ document.getElementById('imposeBtn').addEventListener('click', async () => {
     btn.disabled = false;
     alert('Failed to generate imposed PDF: ' + err.message);
   }
+});
+
+document.getElementById('addPageNumBtn').addEventListener('click', async () => {
+  if (!uploadedPdfFile) return;
+
+  const btn = document.getElementById('addPageNumBtn');
+  btn.disabled = true;
+  btn.textContent = 'Processing…';
+
+  try {
+    const arrayBuffer = await uploadedPdfFile.arrayBuffer();
+    const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+    const font = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+    const pages = pdfDoc.getPages();
+    const fs = Math.max(4, parseInt(document.getElementById('patternNumSize').value) || 15);
+    const hPos = document.getElementById('patternNumH').value;
+    const vPos = document.getElementById('patternNumV').value;
+    const pad = 6;
+
+    pages.forEach((page, i) => {
+      const label = String(i + 1);
+      const { width: pw, height: ph } = page.getSize();
+      const tw = font.widthOfTextAtSize(label, fs);
+      const tx = hPos === 'left' ? pad : hPos === 'center' ? (pw - tw) / 2 : pw - tw - pad;
+      const ty = vPos === 'top' ? ph - fs - pad : pad;
+      page.drawText(label, { x: tx, y: ty, size: fs, font, color: PDFLib.rgb(0, 0, 0) });
+    });
+
+    const pdfBytes = await pdfDoc.save();
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = uploadedPdfFile.name.replace(/\.pdf$/i, '') + '-numbered.pdf';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (err) {
+    alert('Failed to add page numbers: ' + err.message);
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Pages Number in PDF';
 });
