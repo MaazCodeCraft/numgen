@@ -139,14 +139,12 @@ let uploadedPdfFile = null;
 document.getElementById('pdfInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  uploadedPdfFile = file;
 
   const pdfInfo = document.getElementById('pdfInfo');
   const pdfLabel = document.getElementById('pdfLabel');
-  pdfInfo.textContent = 'Reading PDF...';
   pdfInfo.style.color = '#6b7280';
 
-  // Reset reorder section
+  // Reset sections
   document.getElementById('pdfActions').style.display = 'none';
   document.getElementById('reorderSuccess').style.display = 'none';
   document.getElementById('progressWrap').style.display = 'none';
@@ -154,6 +152,91 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
   document.getElementById('imposeProgressWrap').style.display = 'none';
   document.getElementById('imposePreview').style.display = 'none';
 
+  const isDocx = file.name.match(/\.docx$/i);
+
+  if (isDocx) {
+    pdfInfo.textContent = 'Converting Word file to PDF…';
+    pdfInfo.style.color = '#6b7280';
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.convertToHtml({ arrayBuffer });
+
+      const A4_W = 794, A4_H = 1123, SCALE = 2;
+
+      // Use a visible iframe so html2canvas can actually render it
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = `position:fixed;top:0;left:0;width:${A4_W}px;height:${A4_H}px;border:none;z-index:99999;opacity:0;pointer-events:none;`;
+      document.body.appendChild(iframe);
+
+      await new Promise(res => {
+        iframe.onload = res;
+        iframe.srcdoc = `<!DOCTYPE html><html><head><style>
+          *{box-sizing:border-box;margin:0;padding:0;}
+          body{font-family:Arial,sans-serif;font-size:12pt;padding:60px;width:${A4_W}px;background:#fff;}
+          p,li{line-height:1.6;margin-bottom:8px;}
+          h1,h2,h3{margin-bottom:12px;}
+          table{width:100%;border-collapse:collapse;margin-bottom:12px;}
+          td,th{border:1px solid #ccc;padding:6px;}
+          img{max-width:100%;}
+        </style></head><body>${result.value}</body></html>`;
+      });
+      await new Promise(r => setTimeout(r, 400));
+
+      const iDoc = iframe.contentDocument;
+      const totalH = iDoc.body.scrollHeight;
+      const pageCount = Math.max(1, Math.ceil(totalH / A4_H));
+
+      const pdfDoc = await PDFLib.PDFDocument.create();
+
+      for (let p = 0; p < pageCount; p++) {
+        iframe.contentWindow.scrollTo(0, p * A4_H);
+        await new Promise(r => setTimeout(r, 100));
+        const canvas = await html2canvas(iDoc.body, {
+          scale: SCALE,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          width: A4_W,
+          height: A4_H,
+          windowWidth: A4_W,
+          windowHeight: A4_H,
+          x: 0,
+          y: p * A4_H,
+          scrollX: 0,
+          scrollY: 0,
+        });
+        const pngBytes = await new Promise(res => canvas.toBlob(b => b.arrayBuffer().then(res), 'image/png'));
+        const img  = await pdfDoc.embedPng(pngBytes);
+        const page = pdfDoc.addPage([A4_W, A4_H]);
+        page.drawImage(img, { x: 0, y: 0, width: A4_W, height: A4_H });
+      }
+
+      document.body.removeChild(iframe);
+
+      const pdfBytes = await pdfDoc.save();
+      uploadedPdfFile = new File([pdfBytes], file.name.replace(/\.docx$/i, '.pdf'), { type: 'application/pdf' });
+
+      const divisor = selected ? divisorMap[selected] : null;
+      const adjustedCount = divisor && pageCount % divisor !== 0
+        ? pageCount + (divisor - (pageCount % divisor))
+        : pageCount;
+      document.getElementById('limit').value = adjustedCount;
+      pdfLabel.textContent = file.name;
+      pdfInfo.textContent = adjustedCount !== pageCount
+        ? `✓ ${pageCount} pages detected — auto-adjusted to ${adjustedCount} (rounded up to complete last page)`
+        : `✓ ${pageCount} pages detected — converted & ready`;
+      pdfInfo.style.color = '#059669';
+      if (selected) document.getElementById('genBtn').click();
+    } catch (err) {
+      pdfInfo.textContent = 'Failed to convert Word file. Please try another.';
+      pdfInfo.style.color = '#dc2626';
+    }
+    return;
+  }
+
+  // Original PDF handling
+  uploadedPdfFile = file;
+  pdfInfo.textContent = 'Reading PDF...';
   try {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -168,8 +251,6 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
       ? `✓ ${pageCount} pages detected — auto-adjusted to ${adjustedCount} (rounded up to complete last page)`
       : `✓ ${pageCount} pages detected — input auto-filled`;
     pdfInfo.style.color = '#059669';
-
-    // Auto-generate pattern if mode already selected
     if (selected) document.getElementById('genBtn').click();
   } catch {
     pdfInfo.textContent = 'Failed to read PDF. Please try another file.';
@@ -549,7 +630,7 @@ document.getElementById('imposeBtn').addEventListener('click', async () => {
     const outDoc = await PDFLib.PDFDocument.create();
 
     progressBar.style.width = '10%';
-    progressLabel.textContent = 'Imposing pages…';
+    progressLabel.textContent = 'Imposing pages… 0%';
     await new Promise(r => setTimeout(r, 0));
 
     // Output sheet size: A3 landscape for ≥4-up, portrait for 2-up
@@ -617,7 +698,9 @@ document.getElementById('imposeBtn').addEventListener('click', async () => {
       }
 
       // Yield every sheet for UI responsiveness
-      progressBar.style.width = (10 + Math.round((s / totalSheets) * 82)) + '%';
+      const pct = Math.round(((s + 1) / totalSheets) * 100);
+      progressBar.style.width = (10 + Math.round(((s + 1) / totalSheets) * 82)) + '%';
+      progressLabel.textContent = `Imposing pages… ${pct}%`;
       await new Promise(r => setTimeout(r, 0));
     }
 
