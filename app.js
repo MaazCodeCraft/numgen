@@ -134,6 +134,10 @@ options.forEach(opt => {
 // PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+document.getElementById('addPatternNumChk').addEventListener('change', function () {
+  document.getElementById('patternNumOptions').style.display = this.checked ? 'flex' : 'none';
+});
+
 let uploadedPdfFile = null;
 
 document.getElementById('pdfInput').addEventListener('change', async (e) => {
@@ -504,9 +508,14 @@ document.getElementById('reorderBtn').addEventListener('click', async () => {
       if (patternNum > 0 && document.getElementById('addPatternNumChk').checked) {
         const { width: pw, height: ph } = outPage.getSize();
         const label = String(patternNum);
-        const fs = Math.max(4, parseInt(document.getElementById('patternNumSize').value) || 6);
+        const fs = Math.max(4, parseInt(document.getElementById('patternNumSize').value) || 15);
+        const hPos = document.getElementById('patternNumH').value;
+        const vPos = document.getElementById('patternNumV').value;
         const tw = reorderFont.widthOfTextAtSize(label, fs);
-        outPage.drawText(label, { x: pw - tw - 10, y: ph - fs - 5, size: fs, font: reorderFont, color: PDFLib.rgb(0, 0, 0) });
+        const pad = 6;
+        const tx = hPos === 'left' ? pad : hPos === 'center' ? (pw - tw) / 2 : pw - tw - pad;
+        const ty = vPos === 'top' ? ph - fs - pad : pad;
+        outPage.drawText(label, { x: tx, y: ty, size: fs, font: reorderFont, color: PDFLib.rgb(0, 0, 0) });
       }
       // Yield to browser every chunkSize pages to keep UI responsive
       if (i % chunkSize === 0) {
@@ -710,9 +719,14 @@ document.getElementById('imposeBtn').addEventListener('click', async () => {
           // Pattern number in top-right corner of cell
           if (document.getElementById('addPatternNumChk').checked) {
             const label = String(pageNum);
-            const fs = Math.max(4, parseInt(document.getElementById('patternNumSize').value) || 6);
+            const fs = Math.max(4, parseInt(document.getElementById('patternNumSize').value) || 15);
+            const hPos = document.getElementById('patternNumH').value;
+            const vPos = document.getElementById('patternNumV').value;
             const tw = imposeFont.widthOfTextAtSize(label, fs);
-            sheet.drawText(label, { x: cellX + cellW - tw - 6, y: cellY + cellH - fs - 2, size: fs, font: imposeFont, color: PDFLib.rgb(0, 0, 0) });
+            const pad = 6;
+            const tx = cellX + (hPos === 'left' ? pad : hPos === 'center' ? (cellW - tw) / 2 : cellW - tw - pad);
+            const ty = cellY + (vPos === 'top' ? cellH - fs - pad : pad);
+            sheet.drawText(label, { x: tx, y: ty, size: fs, font: imposeFont, color: PDFLib.rgb(0, 0, 0) });
           }
         }
       }

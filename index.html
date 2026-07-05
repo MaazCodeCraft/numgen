@@ -132,10 +132,27 @@
             <input type="checkbox" id="addPatternNumChk" style="width:15px;height:15px;cursor:pointer;" />
             Add pattern number on each page/cell in PDF
           </label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:500;color:#374151;">
-            Font size:
-            <input type="number" id="patternNumSize" value="15" min="4" max="72" style="width:56px;padding:3px 6px;border:1.5px solid #d1d5db;border-radius:6px;font-size:0.82rem;font-family:inherit;color:#111827;" />
-          </label>
+          <div id="patternNumOptions" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:500;color:#374151;">
+              Font size:
+              <input type="number" id="patternNumSize" value="15" min="4" max="72" style="width:56px;padding:3px 6px;border:1.5px solid #d1d5db;border-radius:6px;font-size:0.82rem;font-family:inherit;color:#111827;" />
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:500;color:#374151;">
+              Horizontal:
+              <select id="patternNumH" style="padding:3px 6px;border:1.5px solid #d1d5db;border-radius:6px;font-size:0.82rem;font-family:inherit;color:#111827;">
+                <option value="right" selected>Right</option>
+                <option value="center">Center</option>
+                <option value="left">Left</option>
+              </select>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:500;color:#374151;">
+              Vertical:
+              <select id="patternNumV" style="padding:3px 6px;border:1.5px solid #d1d5db;border-radius:6px;font-size:0.82rem;font-family:inherit;color:#111827;">
+                <option value="top" selected>Top</option>
+                <option value="bottom">Bottom</option>
+              </select>
+            </label>
+          </div>
         </div>
       </div>
     </div>
