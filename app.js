@@ -479,6 +479,7 @@ document.getElementById('reorderBtn').addEventListener('click', async () => {
     progressBar.style.width = '10%';
 
     const outDoc = await PDFLib.PDFDocument.create();
+    const reorderFont = await outDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
 
     // Copy all source pages once for embedding
     const allPageIndices = Array.from({ length: totalSrc }, (_, i) => i);
@@ -492,10 +493,20 @@ document.getElementById('reorderBtn').addEventListener('click', async () => {
     const chunkSize = 100;
     for (let i = 0; i < sequence.length; i++) {
       const pageNum = sequence[i]; // 1-based; 0 = blank
+      let outPage;
       if (pageNum === 0 || pageNum > totalSrc) {
-        outDoc.addPage([blankW, blankH]);
+        outPage = outDoc.addPage([blankW, blankH]);
       } else {
-        outDoc.addPage(copiedPages[pageNum - 1]);
+        outPage = outDoc.addPage(copiedPages[pageNum - 1]);
+      }
+      // Draw pattern number in top-right corner
+      const patternNum = sequence[i];
+      if (patternNum > 0 && document.getElementById('addPatternNumChk').checked) {
+        const { width: pw, height: ph } = outPage.getSize();
+        const label = String(patternNum);
+        const fs = Math.max(4, parseInt(document.getElementById('patternNumSize').value) || 6);
+        const tw = reorderFont.widthOfTextAtSize(label, fs);
+        outPage.drawText(label, { x: pw - tw - 10, y: ph - fs - 5, size: fs, font: reorderFont, color: PDFLib.rgb(0, 0, 0) });
       }
       // Yield to browser every chunkSize pages to keep UI responsive
       if (i % chunkSize === 0) {
@@ -628,6 +639,7 @@ document.getElementById('imposeBtn').addEventListener('click', async () => {
 
     // Load with pdf-lib for output
     const outDoc = await PDFLib.PDFDocument.create();
+    const imposeFont = await outDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
 
     progressBar.style.width = '10%';
     progressLabel.textContent = 'Imposing pages… 0%';
@@ -694,6 +706,14 @@ document.getElementById('imposeBtn').addEventListener('click', async () => {
             x: cellX, y: cellY, width: cellW, height: cellH,
             borderColor: PDFLib.rgb(0, 0, 0), borderWidth: 1,
           });
+
+          // Pattern number in top-right corner of cell
+          if (document.getElementById('addPatternNumChk').checked) {
+            const label = String(pageNum);
+            const fs = Math.max(4, parseInt(document.getElementById('patternNumSize').value) || 6);
+            const tw = imposeFont.widthOfTextAtSize(label, fs);
+            sheet.drawText(label, { x: cellX + cellW - tw - 6, y: cellY + cellH - fs - 2, size: fs, font: imposeFont, color: PDFLib.rgb(0, 0, 0) });
+          }
         }
       }
 

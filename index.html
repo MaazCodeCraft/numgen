@@ -126,6 +126,18 @@
         <div class="stat"><span class="stat-label">Total Pages</span><span class="stat-value" id="statPages">—</span></div>
         <div class="stat"><span class="stat-label">Per Page</span><span class="stat-value" id="statMode">—</span></div>
       </div>
+      <div style="padding:10px 16px;border-top:1px solid #e5e7eb;background:#f9fafb;border-radius:0 0 8px 8px;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;font-weight:500;color:#374151;cursor:pointer;">
+            <input type="checkbox" id="addPatternNumChk" style="width:15px;height:15px;cursor:pointer;" />
+            Add pattern number on each page/cell in PDF
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:500;color:#374151;">
+            Font size:
+            <input type="number" id="patternNumSize" value="15" min="4" max="72" style="width:56px;padding:3px 6px;border:1.5px solid #d1d5db;border-radius:6px;font-size:0.82rem;font-family:inherit;color:#111827;" />
+          </label>
+        </div>
+      </div>
     </div>
 
     <!-- PDF Actions Section -->
@@ -165,7 +177,6 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           <span id="imposeMsg"></span>
         </div>
-        <!-- Layout Preview -->
         <div class="impose-preview" id="imposePreview" style="display:none;">
           <div class="impose-preview-label">Sheet Layout Preview</div>
           <canvas id="imposeCanvas"></canvas>
