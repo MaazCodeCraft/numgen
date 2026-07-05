@@ -237,6 +237,20 @@
 <script>
 (async () => {
   const HASH = '3d60306cda4e8954c88c5db2a07d6ab1051c7d7e0dc6d95257869d90a137d665';
+  const CACHE_KEY = 'numgen_unlock';
+  const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+
+  function grantAccess() {
+    document.getElementById('passwordGate').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+  }
+
+  // Check cached unlock
+  const cached = localStorage.getItem(CACHE_KEY);
+  if (cached && Date.now() - parseInt(cached) < SEVEN_DAYS) {
+    grantAccess();
+  }
+
   async function sha256(str) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
@@ -245,8 +259,8 @@
     const val = document.getElementById('pwInput').value;
     const errEl = document.getElementById('pwError');
     if (await sha256(val) === HASH) {
-      document.getElementById('passwordGate').style.display = 'none';
-      document.getElementById('mainApp').style.display = 'block';
+      localStorage.setItem(CACHE_KEY, Date.now().toString());
+      grantAccess();
     } else {
       errEl.style.display = 'block';
       document.getElementById('pwInput').value = '';
