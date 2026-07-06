@@ -367,7 +367,7 @@ document.getElementById('genBtn').addEventListener('click', () => {
     document.getElementById('imposeBtn').disabled = false;
     document.getElementById('bookletSuccess').style.display = 'none';
     document.getElementById('bookletProgressWrap').style.display = 'none';
-    document.getElementById('bookletBtn').disabled = selected !== '4';
+    document.getElementById('bookletBtn').disabled = selected !== '4' && selected !== '6';
   } else {
     document.getElementById('pdfActions').style.display = 'none';
   }
@@ -783,62 +783,50 @@ document.getElementById('imposeBtn').addEventListener('click', async () => {
 //   0 = topLeft, 1 = topRight, 2 = bottomLeft, 3 = bottomRight
 
 function buildBookletSequence(totalPages, perPage) {
-  // perPage must be 4 for the 2-col × 2-row booklet layout
-  // For other modes we still honour the same 4-round logic but
-  // treat the sheet as having perPage cells split into top/bottom halves.
   const numSheets = Math.ceil(totalPages / perPage);
-  const paddedTotal = numSheets * perPage;
-
-  // sheets[s] = array of perPage slots (null = blank)
-  const sheets = Array.from({ length: numSheets }, () => new Array(perPage).fill(null));
-
-  // For the 4-round booklet pattern we always work with 4 positions per sheet
-  // regardless of perPage, mapping rounds to cell indices:
-  //   round 0 → top-left  (col 0, row 0) = cell index 0
-  //   round 0 → top-right (col 1, row 0) = cell index 1
-  //   round 1 → top-right first, then top-left
-  //   round 2 → bottom-left  = cell index 2
-  //   round 3 → bottom-right first, then bottom-left
-  //
-  // For perPage > 4 we keep the same 4-round structure but each "round"
-  // fills perPage/4 cells per sheet (top-left block, top-right block, etc.).
-  // For simplicity and correctness we implement the exact spec for perPage=4
-  // and generalise by treating each quarter of cells as one position group.
-
-  const cellsPerQuarter = perPage / 4;  // 1 for 4-up, 2 for 8-up, etc.
-
-  // Round definitions: [rowHalf (0=top,1=bottom), startSide (0=left,1=right)]
-  const rounds = [
-    [0, 0],  // Round 1: top, start left
-    [0, 1],  // Round 2: top, start right
-    [1, 0],  // Round 3: bottom, start left
-    [1, 1],  // Round 4: bottom, start right
-  ];
-
+  const sheets = Array.from({ length: numSheets }, () => new Array(perPage).fill(0));
   let pageCounter = 1;
 
-  for (const [rowHalf, startSide] of rounds) {
-    for (let s = 0; s < numSheets; s++) {
-      // Determine which side this sheet gets in this round
-      // startSide=0 (left): even sheets → left, odd → right
-      // startSide=1 (right): even sheets → right, odd → left
-      const side = (s % 2 === 0) ? startSide : 1 - startSide;
-      // col: 0=left half, 1=right half
-      // Within each half, cells are laid out top-to-bottom
-      // Base cell index for this quarter:
-      //   rowHalf=0, side=0 → cells 0..(cellsPerQuarter-1)
-      //   rowHalf=0, side=1 → cells cellsPerQuarter..(2*cellsPerQuarter-1)
-      //   rowHalf=1, side=0 → cells 2*cellsPerQuarter..(3*cellsPerQuarter-1)
-      //   rowHalf=1, side=1 → cells 3*cellsPerQuarter..(4*cellsPerQuarter-1)
-      const baseCell = (rowHalf * 2 + side) * cellsPerQuarter;
-      for (let c = 0; c < cellsPerQuarter; c++) {
-        sheets[s][baseCell + c] = pageCounter <= totalPages ? pageCounter : 0;
+  if (perPage === 6) {
+    // 3-col × 2-row layout: cell indices [0=TL,1=TC,2=TR, 3=BL,4=BC,5=BR]
+    // 6 rounds, each fills one position per sheet:
+    // R1: TL/TR alternating (even→TL, odd→TR)
+    // R2: TC every sheet
+    // R3: TR/TL alternating (even→TR, odd→TL)
+    // R4: BL/BR alternating (even→BL, odd→BR)
+    // R5: BC every sheet
+    // R6: BR/BL alternating (even→BR, odd→BL)
+    const rounds = [
+      s => (s % 2 === 0) ? 0 : 2,  // R1
+      s => 1,                        // R2
+      s => (s % 2 === 0) ? 2 : 0,  // R3
+      s => (s % 2 === 0) ? 3 : 5,  // R4
+      s => 4,                        // R5
+      s => (s % 2 === 0) ? 5 : 3,  // R6
+    ];
+    for (const getCellIdx of rounds) {
+      for (let s = 0; s < numSheets; s++) {
+        sheets[s][getCellIdx(s)] = pageCounter <= totalPages ? pageCounter : 0;
         pageCounter++;
+      }
+    }
+  } else {
+    // 4-round pattern for 4-up (and generalised for 8-up etc.)
+    const cellsPerQuarter = perPage / 4;
+    const rounds = [[0,0],[0,1],[1,0],[1,1]];
+    for (const [rowHalf, startSide] of rounds) {
+      for (let s = 0; s < numSheets; s++) {
+        const side = (s % 2 === 0) ? startSide : 1 - startSide;
+        const baseCell = (rowHalf * 2 + side) * cellsPerQuarter;
+        for (let c = 0; c < cellsPerQuarter; c++) {
+          sheets[s][baseCell + c] = pageCounter <= totalPages ? pageCounter : 0;
+          pageCounter++;
+        }
       }
     }
   }
 
-  return sheets; // sheets[s][cellIndex] = 1-based page number or 0 (blank)
+  return sheets;
 }
 
 document.getElementById('bookletBtn').addEventListener('click', async () => {
