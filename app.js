@@ -156,6 +156,8 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
   document.getElementById('imposeSuccess').style.display = 'none';
   document.getElementById('imposeProgressWrap').style.display = 'none';
   document.getElementById('imposePreview').style.display = 'none';
+  document.getElementById('bookletSuccess').style.display = 'none';
+  document.getElementById('bookletProgressWrap').style.display = 'none';
 
   const isDocx = file.name.match(/\.docx$/i);
 
@@ -363,6 +365,9 @@ document.getElementById('genBtn').addEventListener('click', () => {
     document.getElementById('imposeProgressWrap').style.display = 'none';
     document.getElementById('imposePreview').style.display = 'none';
     document.getElementById('imposeBtn').disabled = false;
+    document.getElementById('bookletSuccess').style.display = 'none';
+    document.getElementById('bookletProgressWrap').style.display = 'none';
+    document.getElementById('bookletBtn').disabled = selected !== '4';
   } else {
     document.getElementById('pdfActions').style.display = 'none';
   }
@@ -763,6 +768,205 @@ document.getElementById('imposeBtn').addEventListener('click', async () => {
     document.getElementById('imposeProgressWrap').style.display = 'none';
     btn.disabled = false;
     alert('Failed to generate imposed PDF: ' + err.message);
+  }
+});
+
+// ── Booklet PDF Generator ─────────────────────────────────────────────────
+// Layout: 4 rounds, each filling one position across all sheets.
+// Positions: [topLeft, topRight, bottomLeft, bottomRight]
+// Round 1: top, starts Left  → alternates L/R across sheets
+// Round 2: top, starts Right → alternates R/L across sheets
+// Round 3: bottom, starts Left  → alternates L/R
+// Round 4: bottom, starts Right → alternates R/L
+//
+// sheet[s] cell layout index:
+//   0 = topLeft, 1 = topRight, 2 = bottomLeft, 3 = bottomRight
+
+function buildBookletSequence(totalPages, perPage) {
+  // perPage must be 4 for the 2-col × 2-row booklet layout
+  // For other modes we still honour the same 4-round logic but
+  // treat the sheet as having perPage cells split into top/bottom halves.
+  const numSheets = Math.ceil(totalPages / perPage);
+  const paddedTotal = numSheets * perPage;
+
+  // sheets[s] = array of perPage slots (null = blank)
+  const sheets = Array.from({ length: numSheets }, () => new Array(perPage).fill(null));
+
+  // For the 4-round booklet pattern we always work with 4 positions per sheet
+  // regardless of perPage, mapping rounds to cell indices:
+  //   round 0 → top-left  (col 0, row 0) = cell index 0
+  //   round 0 → top-right (col 1, row 0) = cell index 1
+  //   round 1 → top-right first, then top-left
+  //   round 2 → bottom-left  = cell index 2
+  //   round 3 → bottom-right first, then bottom-left
+  //
+  // For perPage > 4 we keep the same 4-round structure but each "round"
+  // fills perPage/4 cells per sheet (top-left block, top-right block, etc.).
+  // For simplicity and correctness we implement the exact spec for perPage=4
+  // and generalise by treating each quarter of cells as one position group.
+
+  const cellsPerQuarter = perPage / 4;  // 1 for 4-up, 2 for 8-up, etc.
+
+  // Round definitions: [rowHalf (0=top,1=bottom), startSide (0=left,1=right)]
+  const rounds = [
+    [0, 0],  // Round 1: top, start left
+    [0, 1],  // Round 2: top, start right
+    [1, 0],  // Round 3: bottom, start left
+    [1, 1],  // Round 4: bottom, start right
+  ];
+
+  let pageCounter = 1;
+
+  for (const [rowHalf, startSide] of rounds) {
+    for (let s = 0; s < numSheets; s++) {
+      // Determine which side this sheet gets in this round
+      // startSide=0 (left): even sheets → left, odd → right
+      // startSide=1 (right): even sheets → right, odd → left
+      const side = (s % 2 === 0) ? startSide : 1 - startSide;
+      // col: 0=left half, 1=right half
+      // Within each half, cells are laid out top-to-bottom
+      // Base cell index for this quarter:
+      //   rowHalf=0, side=0 → cells 0..(cellsPerQuarter-1)
+      //   rowHalf=0, side=1 → cells cellsPerQuarter..(2*cellsPerQuarter-1)
+      //   rowHalf=1, side=0 → cells 2*cellsPerQuarter..(3*cellsPerQuarter-1)
+      //   rowHalf=1, side=1 → cells 3*cellsPerQuarter..(4*cellsPerQuarter-1)
+      const baseCell = (rowHalf * 2 + side) * cellsPerQuarter;
+      for (let c = 0; c < cellsPerQuarter; c++) {
+        sheets[s][baseCell + c] = pageCounter <= totalPages ? pageCounter : 0;
+        pageCounter++;
+      }
+    }
+  }
+
+  return sheets; // sheets[s][cellIndex] = 1-based page number or 0 (blank)
+}
+
+document.getElementById('bookletBtn').addEventListener('click', async () => {
+  if (!uploadedPdfFile || !lastNums.length) return;
+
+  const btn           = document.getElementById('bookletBtn');
+  const progressWrap  = document.getElementById('bookletProgressWrap');
+  const progressBar   = document.getElementById('bookletProgressBar');
+  const progressLabel = document.getElementById('bookletProgressLabel');
+  const successEl     = document.getElementById('bookletSuccess');
+
+  btn.disabled = true;
+  successEl.style.display = 'none';
+  progressWrap.style.display = 'flex';
+  progressBar.style.width = '0%';
+  progressLabel.textContent = 'Loading PDF…';
+
+  try {
+    const [cols, rows] = gridMap[selected];   // e.g. [2,2] for 4-up
+    const perPage = parseInt(selected);
+
+    // Build booklet sheet sequence
+    const totalSrcPages = Math.max(...lastNums.filter(n => n > 0));
+    const sheets = buildBookletSequence(totalSrcPages, perPage);
+    const totalSheets = sheets.length;
+    const addedBlanks = sheets.flat().filter(n => n === 0).length;
+
+    progressLabel.textContent = 'Loading PDF…';
+    progressBar.style.width = '5%';
+    await new Promise(r => setTimeout(r, 0));
+
+    const arrayBuffer = await uploadedPdfFile.arrayBuffer();
+    const pdfJsDoc = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+    const srcPageCount = pdfJsDoc.numPages;
+
+    const outDoc = await PDFLib.PDFDocument.create();
+    const bookletFont = await outDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+
+    // Derive cell size from first source page
+    const firstVp = (await pdfJsDoc.getPage(1)).getViewport({ scale: 1 });
+    const srcW = firstVp.width, srcH = firstVp.height;
+    const MARGIN = 20, GAP = 25;
+    const sheetW = cols * srcW + (cols - 1) * GAP + MARGIN * 2;
+    const sheetH = rows * srcH + (rows - 1) * GAP + MARGIN * 2;
+    const cellW = srcW, cellH = srcH;
+    const RENDER_SCALE = 4;
+
+    progressBar.style.width = '10%';
+    progressLabel.textContent = 'Imposing booklet… 0%';
+    await new Promise(r => setTimeout(r, 0));
+
+    for (let s = 0; s < totalSheets; s++) {
+      const sheet = outDoc.addPage([sheetW, sheetH]);
+
+      for (let i = 0; i < perPage; i++) {
+        const pageNum = sheets[s][i]; // 1-based or 0
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const cellX = MARGIN + col * (cellW + GAP);
+        const cellY = sheetH - MARGIN - (row + 1) * cellH - row * GAP;
+
+        if (!pageNum || pageNum > srcPageCount) {
+          sheet.drawRectangle({
+            x: cellX, y: cellY, width: cellW, height: cellH,
+            color: PDFLib.rgb(0.96, 0.96, 0.96),
+            borderColor: PDFLib.rgb(0, 0, 0), borderWidth: 1,
+          });
+        } else {
+          const srcCanvas = await renderPageToCanvas(pdfJsDoc, pageNum, RENDER_SCALE);
+          const pngBytes  = await new Promise(res => srcCanvas.toBlob(b => b.arrayBuffer().then(res), 'image/png'));
+          const img       = await outDoc.embedPng(pngBytes);
+          const scaleX = cellW  / img.width  * RENDER_SCALE;
+          const scaleY = cellH  / img.height * RENDER_SCALE;
+          const scale  = Math.min(scaleX, scaleY);
+          const drawW  = img.width  / RENDER_SCALE * scale;
+          const drawH  = img.height / RENDER_SCALE * scale;
+          sheet.drawImage(img, {
+            x: cellX + (cellW - drawW) / 2,
+            y: cellY + (cellH - drawH) / 2,
+            width: drawW, height: drawH,
+          });
+          sheet.drawRectangle({
+            x: cellX, y: cellY, width: cellW, height: cellH,
+            borderColor: PDFLib.rgb(0, 0, 0), borderWidth: 1,
+          });
+          if (document.getElementById('addPatternNumChk').checked) {
+            const label = String(pageNum);
+            const fs  = Math.max(4, parseInt(document.getElementById('patternNumSize').value) || 15);
+            const hPos = document.getElementById('patternNumH').value;
+            const vPos = document.getElementById('patternNumV').value;
+            const tw  = bookletFont.widthOfTextAtSize(label, fs);
+            const pad = 6;
+            const tx  = cellX + (hPos === 'left' ? pad : hPos === 'center' ? (cellW - tw) / 2 : cellW - tw - pad);
+            const ty  = cellY + (vPos === 'top' ? cellH - fs - pad : pad);
+            sheet.drawText(label, { x: tx, y: ty, size: fs, font: bookletFont, color: PDFLib.rgb(0, 0, 0) });
+          }
+        }
+      }
+
+      progressBar.style.width = (10 + Math.round(((s + 1) / totalSheets) * 82)) + '%';
+      progressLabel.textContent = `Imposing booklet… ${Math.round(((s + 1) / totalSheets) * 100)}%`;
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    progressLabel.textContent = 'Saving…';
+    progressBar.style.width = '95%';
+    await new Promise(r => setTimeout(r, 0));
+
+    const pdfBytes = await outDoc.save();
+    progressBar.style.width = '100%';
+
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = uploadedPdfFile.name.replace(/\.pdf$/i, '') + `-booklet-${selected}up.pdf`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    document.getElementById('bookletMsg').textContent =
+      `Done! ${totalSheets} sheet${totalSheets !== 1 ? 's' : ''} · ${sheets.flat().length} pages total` +
+      (addedBlanks > 0 ? ` · ${addedBlanks} blank page${addedBlanks !== 1 ? 's' : ''} added` : '');
+    successEl.style.display = 'flex';
+    progressWrap.style.display = 'none';
+    btn.disabled = false;
+  } catch (err) {
+    document.getElementById('bookletProgressWrap').style.display = 'none';
+    btn.disabled = false;
+    alert('Failed to generate booklet PDF: ' + err.message);
   }
 });
 

@@ -501,6 +501,7 @@ button.generate:active { transform: translateY(0); }
 }
 
 .progress-bar--purple { background: #7c3aed; }
+.progress-bar--teal   { background: #0d9488; }
 
 .action-success {
   display: flex;
@@ -537,6 +538,8 @@ button.generate:active { transform: translateY(0); }
 .action-btn--purple:hover { background: #6d28d9; transform: translateY(-1px); }
 .action-btn--green  { background: #059669; }
 .action-btn--green:hover  { background: #047857; transform: translateY(-1px); }
+.action-btn--teal   { background: #0d9488; }
+.action-btn--teal:hover   { background: #0f766e; transform: translateY(-1px); }
 .action-btn:active  { transform: translateY(0); }
 .action-btn:disabled { background: #9ca3af; cursor: not-allowed; transform: none; }
 
