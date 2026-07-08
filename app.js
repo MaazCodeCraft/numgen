@@ -367,7 +367,7 @@ document.getElementById('genBtn').addEventListener('click', () => {
     document.getElementById('imposeBtn').disabled = false;
     document.getElementById('bookletSuccess').style.display = 'none';
     document.getElementById('bookletProgressWrap').style.display = 'none';
-    document.getElementById('bookletBtn').disabled = selected !== '4' && selected !== '6';
+    document.getElementById('bookletBtn').disabled = !['4','6','8','9'].includes(selected);
   } else {
     document.getElementById('pdfActions').style.display = 'none';
   }
@@ -788,21 +788,46 @@ function buildBookletSequence(totalPages, perPage) {
   let pageCounter = 1;
 
   if (perPage === 6) {
-    // 3-col × 2-row layout: cell indices [0=TL,1=TC,2=TR, 3=BL,4=BC,5=BR]
-    // 6 rounds, each fills one position per sheet:
-    // R1: TL/TR alternating (even→TL, odd→TR)
-    // R2: TC every sheet
-    // R3: TR/TL alternating (even→TR, odd→TL)
-    // R4: BL/BR alternating (even→BL, odd→BR)
-    // R5: BC every sheet
-    // R6: BR/BL alternating (even→BR, odd→BL)
+    // 3-col × 2-row: cells [0=TL,1=TC,2=TR,3=BL,4=BC,5=BR], 6 rounds
     const rounds = [
-      s => (s % 2 === 0) ? 0 : 2,  // R1
-      s => 1,                        // R2
-      s => (s % 2 === 0) ? 2 : 0,  // R3
-      s => (s % 2 === 0) ? 3 : 5,  // R4
-      s => 4,                        // R5
-      s => (s % 2 === 0) ? 5 : 3,  // R6
+      s => (s % 2 === 0) ? 0 : 2,
+      s => 1,
+      s => (s % 2 === 0) ? 2 : 0,
+      s => (s % 2 === 0) ? 3 : 5,
+      s => 4,
+      s => (s % 2 === 0) ? 5 : 3,
+    ];
+    for (const getCellIdx of rounds) {
+      for (let s = 0; s < numSheets; s++) {
+        sheets[s][getCellIdx(s)] = pageCounter <= totalPages ? pageCounter : 0;
+        pageCounter++;
+      }
+    }
+  } else if (perPage === 8) {
+    // 4-col × 2-row: cells [0-3=top cols, 4-7=bottom cols], 8 rounds
+    // Each round r: even sheet→col(r%4), odd sheet→col(3-(r%4))
+    for (let r = 0; r < 8; r++) {
+      const rowBase = r < 4 ? 0 : 4;
+      const pos = r % 4;
+      for (let s = 0; s < numSheets; s++) {
+        const col = (s % 2 === 0) ? pos : (3 - pos);
+        sheets[s][rowBase + col] = pageCounter <= totalPages ? pageCounter : 0;
+        pageCounter++;
+      }
+    }
+  } else if (perPage === 9) {
+    // 3-col × 3-row: cells [0=TL,1=TC,2=TR, 3=ML,4=MC,5=MR, 6=BL,7=BC,8=BR], 9 rounds
+    // Per row: R1 L/R alt, R2 Center, R3 R/L alt (same as 6-up, extended to 3 rows)
+    const rounds = [
+      s => (s % 2 === 0) ? 0 : 2,
+      s => 1,
+      s => (s % 2 === 0) ? 2 : 0,
+      s => (s % 2 === 0) ? 3 : 5,
+      s => 4,
+      s => (s % 2 === 0) ? 5 : 3,
+      s => (s % 2 === 0) ? 6 : 8,
+      s => 7,
+      s => (s % 2 === 0) ? 8 : 6,
     ];
     for (const getCellIdx of rounds) {
       for (let s = 0; s < numSheets; s++) {
@@ -811,7 +836,7 @@ function buildBookletSequence(totalPages, perPage) {
       }
     }
   } else {
-    // 4-round pattern for 4-up (and generalised for 8-up etc.)
+    // 4-round pattern for 4-up
     const cellsPerQuarter = perPage / 4;
     const rounds = [[0,0],[0,1],[1,0],[1,1]];
     for (const [rowHalf, startSide] of rounds) {
