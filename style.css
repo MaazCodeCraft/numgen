@@ -543,6 +543,24 @@ button.generate:active { transform: translateY(0); }
 .action-btn:active  { transform: translateY(0); }
 .action-btn:disabled { background: #9ca3af; cursor: not-allowed; transform: none; }
 
+/* ── Pattern Number Preview ── */
+.pattern-preview-canvas {
+  display: block;
+  width: 160px;
+  height: 112px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  cursor: zoom-in;
+  transition: box-shadow 0.2s;
+}
+
+.pattern-preview-canvas:hover {
+  box-shadow: 0 4px 16px rgba(26,86,219,0.18);
+  border-color: #1a56db;
+}
+
 /* ── Impose Preview ── */
 .impose-preview {
   display: flex;

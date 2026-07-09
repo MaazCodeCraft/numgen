@@ -138,6 +138,10 @@
               <input type="number" id="patternNumSize" value="15" min="4" max="72" style="width:56px;padding:3px 6px;border:1.5px solid #d1d5db;border-radius:6px;font-size:0.82rem;font-family:inherit;color:#111827;" />
             </label>
             <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:500;color:#374151;">
+              Margin:
+              <input type="number" id="patternNumMargin" value="6" min="0" max="100" style="width:56px;padding:3px 6px;border:1.5px solid #d1d5db;border-radius:6px;font-size:0.82rem;font-family:inherit;color:#111827;" />
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:500;color:#374151;">
               Horizontal:
               <select id="patternNumH" style="padding:3px 6px;border:1.5px solid #d1d5db;border-radius:6px;font-size:0.82rem;font-family:inherit;color:#111827;">
                 <option value="right" selected>Right</option>
@@ -153,6 +157,11 @@
               </select>
             </label>
           </div>
+        </div>
+        <!-- Live Preview -->
+        <div id="patternNumPreview" style="display:none;margin-top:10px;">
+          <div style="font-size:0.72rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Live Preview</div>
+          <canvas id="patternPreviewCanvas" class="pattern-preview-canvas"></canvas>
         </div>
       </div>
     </div>

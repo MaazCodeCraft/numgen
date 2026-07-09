@@ -136,10 +136,141 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 
 document.getElementById('addPatternNumChk').addEventListener('change', function () {
   document.getElementById('patternNumOptions').style.display = this.checked ? 'flex' : 'none';
+  document.getElementById('patternNumPreview').style.display = this.checked ? 'block' : 'none';
   document.getElementById('addPageNumBtn').disabled = !this.checked;
+  if (this.checked) updatePatternPreview();
+});
+
+function updatePatternPreview() {
+  const canvas = document.getElementById('patternPreviewCanvas');
+  const W = 320, H = 224;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Determine the page rect drawn on canvas
+  let pageX = 0, pageY = 0, pageW = W, pageH = H;
+
+  if (previewPageBitmap) {
+    const bw = previewPageBitmap.width, bh = previewPageBitmap.height;
+    const scale = Math.min(W / bw, H / bh);
+    pageW = bw * scale;
+    pageH = bh * scale;
+    pageX = (W - pageW) / 2;
+    pageY = (H - pageH) / 2;
+    ctx.fillStyle = '#f3f4f6';
+    ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(previewPageBitmap, pageX, pageY, pageW, pageH);
+    ctx.strokeStyle = '#d1d5db';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(pageX, pageY, pageW, pageH);
+  } else {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#f0f0f0';
+    ctx.lineWidth = 1;
+    for (let y = 28; y < H - 20; y += 14) {
+      ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(W - 20, y); ctx.stroke();
+    }
+    ctx.strokeStyle = '#d1d5db';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(1, 1, W - 2, H - 2);
+  }
+
+  const fs   = Math.max(4, Math.min(72, parseInt(document.getElementById('patternNumSize').value) || 15));
+  const pad  = Math.max(0, parseInt(document.getElementById('patternNumMargin').value) || 0);
+  const hPos = document.getElementById('patternNumH').value;
+  const vPos = document.getElementById('patternNumV').value;
+  const label = '42';
+
+  // Scale PDF pts → canvas px using the actual rendered page dimensions
+  // PDF page is 595 × 842 pts; pageW/pageH is how many canvas px that maps to
+  const ptScaleX = pageW / 595;
+  const ptScaleY = pageH / 842;
+  const cFs  = Math.round(fs  * ptScaleY);
+  const cPadX = Math.round(pad * ptScaleX);
+  const cPadY = Math.round(pad * ptScaleY);
+
+  ctx.font = `bold ${cFs}px Inter,sans-serif`;
+  ctx.textBaseline = 'top';
+  const tw = ctx.measureText(label).width;
+
+  // Position relative to the page rect, matching PDF coord logic exactly
+  const tx = pageX + (hPos === 'left' ? cPadX : hPos === 'center' ? (pageW - tw) / 2 : pageW - tw - cPadX);
+  const ty = pageY + (vPos === 'top'  ? cPadY : pageH - cFs - cPadY);
+
+  ctx.fillStyle = '#000000';
+  ctx.fillText(label, tx, ty);
+}
+
+['patternNumSize','patternNumMargin','patternNumH','patternNumV'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    if (document.getElementById('addPatternNumChk').checked) updatePatternPreview();
+  });
+});
+
+document.getElementById('patternPreviewCanvas').addEventListener('click', () => {
+  // Render at 2× the actual PDF pt dimensions so it matches exactly
+  const SCALE = 2;
+  const pdfW = 595, pdfH = 842;
+  const W = pdfW * SCALE, H = pdfH * SCALE;
+  const fc = document.createElement('canvas');
+  fc.width = W; fc.height = H;
+  const ctx = fc.getContext('2d');
+
+  if (previewPageBitmap) {
+    ctx.drawImage(previewPageBitmap, 0, 0, W, H);
+  } else {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.lineWidth = 1;
+    for (let y = 40; y < H - 30; y += 28) {
+      ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W - 40, y); ctx.stroke();
+    }
+    ctx.strokeStyle = '#d1d5db';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, W - 2, H - 2);
+  }
+
+  // Use exact same values as PDF (in pts), then scale to canvas px
+  const fs  = Math.max(4, parseInt(document.getElementById('patternNumSize').value) || 15);
+  const pad = Math.max(0, parseInt(document.getElementById('patternNumMargin').value) || 0);
+  const hPos = document.getElementById('patternNumH').value;
+  const vPos = document.getElementById('patternNumV').value;
+  const label = '42';
+
+  // Scale pts → canvas px
+  const cFs  = fs  * SCALE;
+  const cPad = pad * SCALE;
+
+  ctx.font = `bold ${cFs}px Inter,sans-serif`;
+  ctx.textBaseline = 'top';
+  const tw = ctx.measureText(label).width;
+
+  // Mirror PDF coord logic: PDF top = canvas top, PDF bottom = canvas bottom
+  // PDF: ty = vPos==='top' ? ph - fs - pad : pad  (bottom-up)
+  // Canvas: vPos==='top' → near top (small y), vPos==='bottom' → near bottom (large y)
+  const tx = hPos === 'left' ? cPad : hPos === 'center' ? (W - tw) / 2 : W - tw - cPad;
+  const ty = vPos === 'top'  ? cPad : H - cFs - cPad;
+
+  ctx.fillStyle = '#000000';
+  ctx.fillText(label, tx, ty);
+
+  fc.toBlob(blob => {
+    const imgUrl = URL.createObjectURL(blob);
+    const html = `<!DOCTYPE html><html><head><title>Number Position Preview</title>
+      <style>*{margin:0;padding:0;}body{background:#1f2937;display:flex;align-items:center;justify-content:center;min-height:100vh;}
+      img{max-width:100%;max-height:100vh;box-shadow:0 8px 40px rgba(0,0,0,0.5);}</style></head>
+      <body><img src="${imgUrl}"></body></html>`;
+    const htmlBlob = new Blob([html], { type: 'text/html' });
+    const htmlUrl = URL.createObjectURL(htmlBlob);
+    window.open(htmlUrl, '_blank');
+  }, 'image/png');
 });
 
 let uploadedPdfFile = null;
+let previewPageBitmap = null;
 
 document.getElementById('pdfInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
@@ -148,6 +279,8 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
   const pdfInfo = document.getElementById('pdfInfo');
   const pdfLabel = document.getElementById('pdfLabel');
   pdfInfo.style.color = '#6b7280';
+
+  previewPageBitmap = null;
 
   // Reset sections
   document.getElementById('pdfActions').style.display = 'none';
@@ -223,6 +356,17 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
       const pdfBytes = await pdfDoc.save();
       uploadedPdfFile = new File([pdfBytes], file.name.replace(/\.docx$/i, '.pdf'), { type: 'application/pdf' });
 
+      // Render page 1 for live preview
+      const previewPdf = await pdfjsLib.getDocument({ data: pdfBytes.slice(0) }).promise;
+      const pg1 = await previewPdf.getPage(1);
+      const vp  = pg1.getViewport({ scale: 1 });
+      const offscreen = document.createElement('canvas');
+      offscreen.width  = Math.round(vp.width);
+      offscreen.height = Math.round(vp.height);
+      await pg1.render({ canvasContext: offscreen.getContext('2d'), viewport: vp }).promise;
+      previewPageBitmap = await createImageBitmap(offscreen);
+      if (document.getElementById('addPatternNumChk').checked) updatePatternPreview();
+
       const divisor = selected ? divisorMap[selected] : null;
       const adjustedCount = divisor && pageCount % divisor !== 0
         ? pageCount + (divisor - (pageCount % divisor))
@@ -258,6 +402,15 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
       ? `✓ ${pageCount} pages detected — auto-adjusted to ${adjustedCount} (rounded up to complete last page)`
       : `✓ ${pageCount} pages detected — input auto-filled`;
     pdfInfo.style.color = '#059669';
+    // Render page 1 into a bitmap for the live preview
+    const pg1 = await pdf.getPage(1);
+    const vp  = pg1.getViewport({ scale: 1 });
+    const offscreen = document.createElement('canvas');
+    offscreen.width  = Math.round(vp.width);
+    offscreen.height = Math.round(vp.height);
+    await pg1.render({ canvasContext: offscreen.getContext('2d'), viewport: vp }).promise;
+    previewPageBitmap = await createImageBitmap(offscreen);
+    if (document.getElementById('addPatternNumChk').checked) updatePatternPreview();
     if (selected) document.getElementById('genBtn').click();
   } catch {
     pdfInfo.textContent = 'Failed to read PDF. Please try another file.';
@@ -515,10 +668,10 @@ document.getElementById('reorderBtn').addEventListener('click', async () => {
         const { width: pw, height: ph } = outPage.getSize();
         const label = String(patternNum);
         const fs = Math.max(4, parseInt(document.getElementById('patternNumSize').value) || 15);
+        const pad = Math.max(0, parseInt(document.getElementById('patternNumMargin').value) || 0);
         const hPos = document.getElementById('patternNumH').value;
         const vPos = document.getElementById('patternNumV').value;
         const tw = reorderFont.widthOfTextAtSize(label, fs);
-        const pad = 6;
         const tx = hPos === 'left' ? pad : hPos === 'center' ? (pw - tw) / 2 : pw - tw - pad;
         const ty = vPos === 'top' ? ph - fs - pad : pad;
         outPage.drawText(label, { x: tx, y: ty, size: fs, font: reorderFont, color: PDFLib.rgb(0, 0, 0) });
@@ -726,10 +879,10 @@ document.getElementById('imposeBtn').addEventListener('click', async () => {
           if (document.getElementById('addPatternNumChk').checked) {
             const label = String(pageNum);
             const fs = Math.max(4, parseInt(document.getElementById('patternNumSize').value) || 15);
+            const pad = Math.max(0, parseInt(document.getElementById('patternNumMargin').value) || 0);
             const hPos = document.getElementById('patternNumH').value;
             const vPos = document.getElementById('patternNumV').value;
             const tw = imposeFont.widthOfTextAtSize(label, fs);
-            const pad = 6;
             const tx = cellX + (hPos === 'left' ? pad : hPos === 'center' ? (cellW - tw) / 2 : cellW - tw - pad);
             const ty = cellY + (vPos === 'top' ? cellH - fs - pad : pad);
             sheet.drawText(label, { x: tx, y: ty, size: fs, font: imposeFont, color: PDFLib.rgb(0, 0, 0) });
@@ -940,10 +1093,10 @@ document.getElementById('bookletBtn').addEventListener('click', async () => {
           if (document.getElementById('addPatternNumChk').checked) {
             const label = String(pageNum);
             const fs  = Math.max(4, parseInt(document.getElementById('patternNumSize').value) || 15);
+            const pad = Math.max(0, parseInt(document.getElementById('patternNumMargin').value) || 0);
             const hPos = document.getElementById('patternNumH').value;
             const vPos = document.getElementById('patternNumV').value;
             const tw  = bookletFont.widthOfTextAtSize(label, fs);
-            const pad = 6;
             const tx  = cellX + (hPos === 'left' ? pad : hPos === 'center' ? (cellW - tw) / 2 : cellW - tw - pad);
             const ty  = cellY + (vPos === 'top' ? cellH - fs - pad : pad);
             sheet.drawText(label, { x: tx, y: ty, size: fs, font: bookletFont, color: PDFLib.rgb(0, 0, 0) });
@@ -996,9 +1149,9 @@ document.getElementById('addPageNumBtn').addEventListener('click', async () => {
     const font = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
     const pages = pdfDoc.getPages();
     const fs = Math.max(4, parseInt(document.getElementById('patternNumSize').value) || 15);
+    const pad = Math.max(0, parseInt(document.getElementById('patternNumMargin').value) || 0);
     const hPos = document.getElementById('patternNumH').value;
     const vPos = document.getElementById('patternNumV').value;
-    const pad = 6;
 
     pages.forEach((page, i) => {
       const label = String(i + 1);
