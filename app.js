@@ -521,6 +521,9 @@ document.getElementById('genBtn').addEventListener('click', () => {
     document.getElementById('bookletSuccess').style.display = 'none';
     document.getElementById('bookletProgressWrap').style.display = 'none';
     document.getElementById('bookletBtn').disabled = !['4','6','8','9'].includes(selected);
+    document.getElementById('singleSideSuccess').style.display = 'none';
+    document.getElementById('singleSideProgressWrap').style.display = 'none';
+    document.getElementById('singleSideBtn').disabled = false;
   } else {
     document.getElementById('pdfActions').style.display = 'none';
   }
@@ -1133,6 +1136,120 @@ document.getElementById('bookletBtn').addEventListener('click', async () => {
     document.getElementById('bookletProgressWrap').style.display = 'none';
     btn.disabled = false;
     alert('Failed to generate booklet PDF: ' + err.message);
+  }
+});
+
+document.getElementById('singleSideBtn').addEventListener('click', async () => {
+  if (!uploadedPdfFile || !lastNums.length) return;
+
+  const btn           = document.getElementById('singleSideBtn');
+  const progressWrap  = document.getElementById('singleSideProgressWrap');
+  const progressBar   = document.getElementById('singleSideProgressBar');
+  const progressLabel = document.getElementById('singleSideProgressLabel');
+  const successEl     = document.getElementById('singleSideSuccess');
+
+  btn.disabled = true;
+  successEl.style.display = 'none';
+  progressWrap.style.display = 'flex';
+  progressBar.style.width = '0%';
+  progressLabel.textContent = 'Loading PDF…';
+
+  try {
+    const [cols, rows] = gridMap[selected];
+    const perPage = parseInt(selected);
+
+    const arrayBuffer = await uploadedPdfFile.arrayBuffer();
+    const pdfJsDoc = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+    const srcPageCount = pdfJsDoc.numPages;
+
+    // Straight sequence: 1,2,3,4,5,6... padded to perPage multiple
+    const sequence = Array.from({ length: srcPageCount }, (_, i) => i + 1);
+    while (sequence.length % perPage !== 0) sequence.push(0);
+    const totalSheets = sequence.length / perPage;
+    const addedBlanks = sequence.filter(n => n === 0).length;
+
+    const outDoc = await PDFLib.PDFDocument.create();
+    const singleFont = await outDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+
+    const firstVp = (await pdfJsDoc.getPage(1)).getViewport({ scale: 1 });
+    const srcW = firstVp.width, srcH = firstVp.height;
+    const MARGIN = 20, GAP = 25, RENDER_SCALE = 4;
+    const sheetW = cols * srcW + (cols - 1) * GAP + MARGIN * 2;
+    const sheetH = rows * srcH + (rows - 1) * GAP + MARGIN * 2;
+    const cellW = srcW, cellH = srcH;
+
+    progressBar.style.width = '10%';
+    progressLabel.textContent = 'Imposing pages… 0%';
+    await new Promise(r => setTimeout(r, 0));
+
+    for (let s = 0; s < totalSheets; s++) {
+      const sheet = outDoc.addPage([sheetW, sheetH]);
+
+      for (let i = 0; i < perPage; i++) {
+        const pageNum = sequence[s * perPage + i];
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const cellX = MARGIN + col * (cellW + GAP);
+        const cellY = sheetH - MARGIN - (row + 1) * cellH - row * GAP;
+
+        if (pageNum === 0 || pageNum > srcPageCount) {
+          sheet.drawRectangle({ x: cellX, y: cellY, width: cellW, height: cellH,
+            color: PDFLib.rgb(0.96, 0.96, 0.96), borderColor: PDFLib.rgb(0, 0, 0), borderWidth: 1 });
+        } else {
+          const srcCanvas = await renderPageToCanvas(pdfJsDoc, pageNum, RENDER_SCALE);
+          const pngBytes  = await new Promise(res => srcCanvas.toBlob(b => b.arrayBuffer().then(res), 'image/png'));
+          const img       = await outDoc.embedPng(pngBytes);
+          const scaleX = cellW / img.width  * RENDER_SCALE;
+          const scaleY = cellH / img.height * RENDER_SCALE;
+          const scale  = Math.min(scaleX, scaleY);
+          const drawW  = img.width  / RENDER_SCALE * scale;
+          const drawH  = img.height / RENDER_SCALE * scale;
+          sheet.drawImage(img, { x: cellX + (cellW - drawW) / 2, y: cellY + (cellH - drawH) / 2, width: drawW, height: drawH });
+          sheet.drawRectangle({ x: cellX, y: cellY, width: cellW, height: cellH,
+            borderColor: PDFLib.rgb(0, 0, 0), borderWidth: 1 });
+          if (document.getElementById('addPatternNumChk').checked) {
+            const label = String(pageNum);
+            const fs  = Math.max(4, parseInt(document.getElementById('patternNumSize').value) || 15);
+            const pad = Math.max(0, parseInt(document.getElementById('patternNumMargin').value) || 0);
+            const hPos = document.getElementById('patternNumH').value;
+            const vPos = document.getElementById('patternNumV').value;
+            const tw = singleFont.widthOfTextAtSize(label, fs);
+            const tx = cellX + (hPos === 'left' ? pad : hPos === 'center' ? (cellW - tw) / 2 : cellW - tw - pad);
+            const ty = cellY + (vPos === 'top' ? cellH - fs - pad : pad);
+            sheet.drawText(label, { x: tx, y: ty, size: fs, font: singleFont, color: PDFLib.rgb(0, 0, 0) });
+          }
+        }
+      }
+
+      progressBar.style.width = (10 + Math.round(((s + 1) / totalSheets) * 82)) + '%';
+      progressLabel.textContent = `Imposing pages… ${Math.round(((s + 1) / totalSheets) * 100)}%`;
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    progressLabel.textContent = 'Saving…';
+    progressBar.style.width = '95%';
+    await new Promise(r => setTimeout(r, 0));
+
+    const pdfBytes = await outDoc.save();
+    progressBar.style.width = '100%';
+
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = uploadedPdfFile.name.replace(/\.pdf$/i, '') + `-single-side-${selected}up.pdf`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    document.getElementById('singleSideMsg').textContent =
+      `Done! ${totalSheets} sheet${totalSheets !== 1 ? 's' : ''} · ${sequence.length} pages total` +
+      (addedBlanks > 0 ? ` · ${addedBlanks} blank page${addedBlanks !== 1 ? 's' : ''} added` : '');
+    successEl.style.display = 'flex';
+    progressWrap.style.display = 'none';
+    btn.disabled = false;
+  } catch (err) {
+    document.getElementById('singleSideProgressWrap').style.display = 'none';
+    btn.disabled = false;
+    alert('Failed to generate single side PDF: ' + err.message);
   }
 });
 
