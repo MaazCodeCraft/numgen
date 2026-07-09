@@ -191,6 +191,87 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
           Add Pages Number in PDF
         </button>
+
+        <!-- Stamp Section -->
+        <div style="border-top:1px solid #e5e7eb;padding-top:12px;display:flex;flex-direction:column;gap:10px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;font-weight:500;color:#374151;cursor:pointer;">
+            <input type="checkbox" id="addStampChk" style="width:15px;height:15px;cursor:pointer;" />
+            Add stamp on each page
+          </label>
+          <div id="stampOptions" style="display:none;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:500;color:#374151;">
+                Size:
+                <input type="number" id="stampSize" value="80" min="10" max="400" style="width:64px;padding:3px 6px;border:1.5px solid #d1d5db;border-radius:6px;font-size:0.82rem;font-family:inherit;color:#111827;" />
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:500;color:#374151;">
+                Margin:
+                <input type="number" id="stampMargin" value="10" min="0" max="200" style="width:56px;padding:3px 6px;border:1.5px solid #d1d5db;border-radius:6px;font-size:0.82rem;font-family:inherit;color:#111827;" />
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:500;color:#374151;">
+                Horizontal:
+                <select id="stampH" style="padding:3px 6px;border:1.5px solid #d1d5db;border-radius:6px;font-size:0.82rem;font-family:inherit;color:#111827;">
+                  <option value="right" selected>Right</option>
+                  <option value="center">Center</option>
+                  <option value="left">Left</option>
+                </select>
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:500;color:#374151;">
+                Vertical:
+                <select id="stampV" style="padding:3px 6px;border:1.5px solid #d1d5db;border-radius:6px;font-size:0.82rem;font-family:inherit;color:#111827;">
+                  <option value="bottom" selected>Bottom</option>
+                  <option value="top">Top</option>
+                </select>
+              </label>
+            </div>
+            <!-- Stamp Live Preview -->
+            <div>
+              <div style="font-size:0.72rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Live Preview</div>
+              <canvas id="stampPreviewCanvas" style="display:block;width:160px;height:112px;border:1.5px solid #e5e7eb;border-radius:6px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:zoom-in;"></canvas>
+            </div>
+          </div>
+          <button class="action-btn action-btn--blue" id="addStampBtn" disabled>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>
+            Add Stamp to PDF
+          </button>
+          <div class="action-success" id="stampSuccess" style="display:none;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <span id="stampMsg"></span>
+          </div>
+        </div>
+
+        <!-- Watermark Section -->
+        <div style="border-top:1px solid #e5e7eb;padding-top:12px;display:flex;flex-direction:column;gap:10px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;font-weight:500;color:#374151;cursor:pointer;">
+            <input type="checkbox" id="addWatermarkChk" style="width:15px;height:15px;cursor:pointer;" />
+            Add watermark on each page
+          </label>
+          <div id="watermarkOptions" style="display:none;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:500;color:#374151;">
+                Font size:
+                <input type="number" id="wmFontSize" value="40" min="8" max="120" style="width:56px;padding:3px 6px;border:1.5px solid #d1d5db;border-radius:6px;font-size:0.82rem;font-family:inherit;color:#111827;" />
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:500;color:#374151;">
+                Opacity:
+                <input type="number" id="wmOpacity" value="15" min="1" max="100" style="width:56px;padding:3px 6px;border:1.5px solid #d1d5db;border-radius:6px;font-size:0.82rem;font-family:inherit;color:#111827;" />
+              </label>
+            </div>
+            <!-- Watermark Live Preview -->
+            <div>
+              <div style="font-size:0.72rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Live Preview</div>
+              <canvas id="wmPreviewCanvas" style="display:block;width:160px;height:112px;border:1.5px solid #e5e7eb;border-radius:6px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:zoom-in;"></canvas>
+            </div>
+          </div>
+          <button class="action-btn action-btn--blue" id="addWatermarkBtn" disabled>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            Add Watermark to PDF
+          </button>
+          <div class="action-success" id="wmSuccess" style="display:none;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <span id="wmMsg"></span>
+          </div>
+        </div>
       </div>
 
       <!-- Impose Card -->

@@ -366,6 +366,7 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
       await pg1.render({ canvasContext: offscreen.getContext('2d'), viewport: vp }).promise;
       previewPageBitmap = await createImageBitmap(offscreen);
       if (document.getElementById('addPatternNumChk').checked) updatePatternPreview();
+      if (document.getElementById('addStampChk').checked) updateStampPreview();
 
       const divisor = selected ? divisorMap[selected] : null;
       const adjustedCount = divisor && pageCount % divisor !== 0
@@ -411,6 +412,8 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
     await pg1.render({ canvasContext: offscreen.getContext('2d'), viewport: vp }).promise;
     previewPageBitmap = await createImageBitmap(offscreen);
     if (document.getElementById('addPatternNumChk').checked) updatePatternPreview();
+    if (document.getElementById('addStampChk').checked) updateStampPreview();
+    if (document.getElementById('addWatermarkChk').checked) updateWatermarkPreview();
     if (selected) document.getElementById('genBtn').click();
   } catch {
     pdfInfo.textContent = 'Failed to read PDF. Please try another file.';
@@ -1251,6 +1254,335 @@ document.getElementById('singleSideBtn').addEventListener('click', async () => {
     btn.disabled = false;
     alert('Failed to generate single side PDF: ' + err.message);
   }
+});
+
+document.getElementById('addWatermarkChk').addEventListener('change', function () {
+  document.getElementById('watermarkOptions').style.display = this.checked ? 'flex' : 'none';
+  document.getElementById('addWatermarkBtn').disabled = !this.checked;
+  if (this.checked) updateWatermarkPreview();
+});
+
+const WM_LINE1 = 'Maaz Photostat Jehangira';
+const WM_LINE2 = '0300-5770935';
+
+function drawWatermark(ctx, W, H, pageX, pageY, pageW, pageH) {
+  const fs = Math.max(8, parseInt(document.getElementById('wmFontSize').value) || 40);
+  const opacity = Math.max(1, Math.min(100, parseInt(document.getElementById('wmOpacity').value) || 15)) / 100;
+  const ptScaleY = pageH / 842;
+  const cFs = fs * ptScaleY;
+
+  ctx.save();
+  ctx.translate(pageX + pageW / 2, pageY + pageH / 2);
+  ctx.rotate(-Math.PI / 4);
+  ctx.globalAlpha = opacity;
+  ctx.fillStyle = '#1a56db';
+  ctx.font = `bold ${cFs}px Inter,sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(WM_LINE1, 0, -cFs * 0.7);
+  ctx.fillText(WM_LINE2, 0,  cFs * 0.7);
+  ctx.restore();
+}
+
+function updateWatermarkPreview() {
+  const canvas = document.getElementById('wmPreviewCanvas');
+  const W = 320, H = 224;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  let pageX = 0, pageY = 0, pageW = W, pageH = H;
+
+  if (previewPageBitmap) {
+    const bw = previewPageBitmap.width, bh = previewPageBitmap.height;
+    const scale = Math.min(W / bw, H / bh);
+    pageW = bw * scale; pageH = bh * scale;
+    pageX = (W - pageW) / 2; pageY = (H - pageH) / 2;
+    ctx.fillStyle = '#f3f4f6'; ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(previewPageBitmap, pageX, pageY, pageW, pageH);
+    ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 1;
+    ctx.strokeRect(pageX, pageY, pageW, pageH);
+  } else {
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#f0f0f0'; ctx.lineWidth = 1;
+    for (let y = 28; y < H - 20; y += 14) {
+      ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(W - 20, y); ctx.stroke();
+    }
+    ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(1, 1, W - 2, H - 2);
+  }
+
+  drawWatermark(ctx, W, H, pageX, pageY, pageW, pageH);
+}
+
+['wmFontSize', 'wmOpacity'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    if (document.getElementById('addWatermarkChk').checked) updateWatermarkPreview();
+  });
+});
+
+document.getElementById('wmPreviewCanvas').addEventListener('click', () => {
+  const SCALE = 2;
+  const W = 595 * SCALE, H = 842 * SCALE;
+  const fc = document.createElement('canvas');
+  fc.width = W; fc.height = H;
+  const ctx = fc.getContext('2d');
+
+  if (previewPageBitmap) {
+    ctx.drawImage(previewPageBitmap, 0, 0, W, H);
+  } else {
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
+    for (let y = 40; y < H - 30; y += 28) {
+      ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W - 40, y); ctx.stroke();
+    }
+    ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, W - 2, H - 2);
+  }
+
+  drawWatermark(ctx, W, H, 0, 0, W, H);
+
+  fc.toBlob(blob => {
+    const imgUrl = URL.createObjectURL(blob);
+    const html = `<!DOCTYPE html><html><head><title>Watermark Preview</title>
+      <style>*{margin:0;padding:0;}body{background:#1f2937;display:flex;align-items:center;justify-content:center;min-height:100vh;}
+      img{max-width:100%;max-height:100vh;box-shadow:0 8px 40px rgba(0,0,0,0.5);}</style></head>
+      <body><img src="${imgUrl}"></body></html>`;
+    window.open(URL.createObjectURL(new Blob([html], { type: 'text/html' })), '_blank');
+  }, 'image/png');
+});
+
+document.getElementById('addWatermarkBtn').addEventListener('click', async () => {
+  if (!uploadedPdfFile) return;
+  const btn = document.getElementById('addWatermarkBtn');
+  const successEl = document.getElementById('wmSuccess');
+  btn.disabled = true;
+  btn.textContent = 'Processing…';
+  successEl.style.display = 'none';
+
+  try {
+    const fs      = Math.max(8, parseInt(document.getElementById('wmFontSize').value) || 40);
+    const opacity = Math.max(1, Math.min(100, parseInt(document.getElementById('wmOpacity').value) || 15)) / 100;
+
+    const arrayBuffer = await uploadedPdfFile.arrayBuffer();
+    const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+    const font   = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+
+    pdfDoc.getPages().forEach(page => {
+      const { width: pw, height: ph } = page.getSize();
+      const cx = pw / 2, cy = ph / 2;
+      // pdf-lib rotates text around its (x,y) anchor (bottom-left).
+      // To visually center each line at (cx, cy ± d), we back-rotate the
+      // text's local center (tw/2, fs/2) by -45° and subtract from target.
+      // rotate(-45°) * (lx,ly) = (lx*cos45 + ly*sin45, -lx*sin45 + ly*cos45)
+      const C = Math.SQRT2 / 2; // cos45 = sin45
+
+      [WM_LINE1, WM_LINE2].forEach((line, i) => {
+        const tw = font.widthOfTextAtSize(line, fs);
+        const d  = fs * 0.7;
+        const sign = i === 0 ? -1 : 1;
+        // Target visual center for this line
+        const tcx = cx, tcy = cy + sign * d;
+        // Local center of text box (anchor-relative)
+        const lx = tw / 2, ly = fs / 2;
+        // Back-rotate local center by -45° to get anchor offset
+        const ax = lx * C + ly * C;   // rotated lx component
+        const ay = -lx * C + ly * C;  // rotated ly component
+        page.drawText(line, {
+          x: tcx - ax,
+          y: tcy - ay,
+          size: fs, font,
+          color: PDFLib.rgb(0.1, 0.33, 0.86),
+          opacity,
+          rotate: PDFLib.degrees(-45),
+        });
+      });
+    });
+
+    const pdfBytes = await pdfDoc.save();
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = uploadedPdfFile.name.replace(/\.pdf$/i, '') + '-watermarked.pdf';
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    document.getElementById('wmMsg').textContent = `Done! Watermark added to ${pdfDoc.getPageCount()} page(s).`;
+    successEl.style.display = 'flex';
+  } catch (err) {
+    alert('Failed to add watermark: ' + err.message);
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg> Add Watermark to PDF';
+});
+
+document.getElementById('addStampChk').addEventListener('change', function () {
+  document.getElementById('stampOptions').style.display = this.checked ? 'flex' : 'none';
+  document.getElementById('addStampBtn').disabled = !this.checked;
+  if (this.checked) updateStampPreview();
+});
+
+let stampImageBitmap = null;
+
+// Pre-load Stamp.png
+(async () => {
+  try {
+    const res = await fetch('Stamp.png');
+    const blob = await res.blob();
+    stampImageBitmap = await createImageBitmap(blob);
+  } catch {}
+})();
+
+function updateStampPreview() {
+  const canvas = document.getElementById('stampPreviewCanvas');
+  const W = 320, H = 224;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  let pageX = 0, pageY = 0, pageW = W, pageH = H;
+
+  if (previewPageBitmap) {
+    const bw = previewPageBitmap.width, bh = previewPageBitmap.height;
+    const scale = Math.min(W / bw, H / bh);
+    pageW = bw * scale; pageH = bh * scale;
+    pageX = (W - pageW) / 2; pageY = (H - pageH) / 2;
+    ctx.fillStyle = '#f3f4f6'; ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(previewPageBitmap, pageX, pageY, pageW, pageH);
+    ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 1;
+    ctx.strokeRect(pageX, pageY, pageW, pageH);
+  } else {
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#f0f0f0'; ctx.lineWidth = 1;
+    for (let y = 28; y < H - 20; y += 14) {
+      ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(W - 20, y); ctx.stroke();
+    }
+    ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(1, 1, W - 2, H - 2);
+  }
+
+  if (!stampImageBitmap) return;
+
+  const size   = Math.max(10, parseInt(document.getElementById('stampSize').value) || 80);
+  const margin = Math.max(0, parseInt(document.getElementById('stampMargin').value) || 10);
+  const hPos   = document.getElementById('stampH').value;
+  const vPos   = document.getElementById('stampV').value;
+
+  // Scale PDF pts → canvas px using actual page rect (same as pattern preview)
+  const ptScaleX = pageW / 595;
+  const ptScaleY = pageH / 842;
+  const cSize    = size   * Math.min(ptScaleX, ptScaleY);
+  const cMarginX = margin * ptScaleX;
+  const cMarginY = margin * ptScaleY;
+
+  const aspect = stampImageBitmap.width / stampImageBitmap.height;
+  const sw = cSize, sh = cSize / aspect;
+
+  const tx = pageX + (hPos === 'left' ? cMarginX : hPos === 'center' ? (pageW - sw) / 2 : pageW - sw - cMarginX);
+  const ty = pageY + (vPos === 'top'  ? cMarginY : pageH - sh - cMarginY);
+
+  ctx.drawImage(stampImageBitmap, tx, ty, sw, sh);
+}
+
+document.getElementById('stampPreviewCanvas').addEventListener('click', () => {
+  const SCALE = 2;
+  const W = 595 * SCALE, H = 842 * SCALE;
+  const fc = document.createElement('canvas');
+  fc.width = W; fc.height = H;
+  const ctx = fc.getContext('2d');
+
+  if (previewPageBitmap) {
+    ctx.drawImage(previewPageBitmap, 0, 0, W, H);
+  } else {
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
+    for (let y = 40; y < H - 30; y += 28) {
+      ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W - 40, y); ctx.stroke();
+    }
+    ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, W - 2, H - 2);
+  }
+
+  if (stampImageBitmap) {
+    const size   = Math.max(10, parseInt(document.getElementById('stampSize').value) || 80);
+    const margin = Math.max(0, parseInt(document.getElementById('stampMargin').value) || 10);
+    const hPos   = document.getElementById('stampH').value;
+    const vPos   = document.getElementById('stampV').value;
+    const cSize    = size   * SCALE;
+    const cMarginX = margin * SCALE;
+    const cMarginY = margin * SCALE;
+    const aspect = stampImageBitmap.width / stampImageBitmap.height;
+    const sw = cSize, sh = cSize / aspect;
+    const tx = hPos === 'left' ? cMarginX : hPos === 'center' ? (W - sw) / 2 : W - sw - cMarginX;
+    const ty = vPos === 'top'  ? cMarginY : H - sh - cMarginY;
+    ctx.drawImage(stampImageBitmap, tx, ty, sw, sh);
+  }
+
+  fc.toBlob(blob => {
+    const imgUrl = URL.createObjectURL(blob);
+    const html = `<!DOCTYPE html><html><head><title>Stamp Position Preview</title>
+      <style>*{margin:0;padding:0;}body{background:#1f2937;display:flex;align-items:center;justify-content:center;min-height:100vh;}
+      img{max-width:100%;max-height:100vh;box-shadow:0 8px 40px rgba(0,0,0,0.5);}</style></head>
+      <body><img src="${imgUrl}"></body></html>`;
+    const htmlBlob = new Blob([html], { type: 'text/html' });
+    window.open(URL.createObjectURL(htmlBlob), '_blank');
+  }, 'image/png');
+});
+
+['stampSize','stampMargin','stampH','stampV'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    if (document.getElementById('addStampChk').checked) updateStampPreview();
+  });
+});
+
+document.getElementById('addStampBtn').addEventListener('click', async () => {
+  if (!uploadedPdfFile) return;
+
+  const btn = document.getElementById('addStampBtn');
+  const successEl = document.getElementById('stampSuccess');
+  btn.disabled = true;
+  btn.textContent = 'Processing…';
+  successEl.style.display = 'none';
+
+  try {
+    // Fetch stamp as bytes
+    const stampRes   = await fetch('Stamp.png');
+    const stampBytes = await stampRes.arrayBuffer();
+
+    const arrayBuffer = await uploadedPdfFile.arrayBuffer();
+    const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+    const stampImg = await pdfDoc.embedPng(stampBytes);
+
+    const size   = Math.max(10, parseInt(document.getElementById('stampSize').value) || 80);
+    const margin = Math.max(0, parseInt(document.getElementById('stampMargin').value) || 10);
+    const hPos   = document.getElementById('stampH').value;
+    const vPos   = document.getElementById('stampV').value;
+
+    const aspect = stampImg.width / stampImg.height;
+    const sw = size, sh = size / aspect;
+
+    pdfDoc.getPages().forEach(page => {
+      const { width: pw, height: ph } = page.getSize();
+      const tx = hPos === 'left' ? margin : hPos === 'center' ? (pw - sw) / 2 : pw - sw - margin;
+      const ty = vPos === 'top'  ? ph - sh - margin : margin;
+      page.drawImage(stampImg, { x: tx, y: ty, width: sw, height: sh });
+    });
+
+    const pdfBytes = await pdfDoc.save();
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = uploadedPdfFile.name.replace(/\.pdf$/i, '') + '-stamped.pdf';
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    document.getElementById('stampMsg').textContent = `Done! Stamp added to ${pdfDoc.getPageCount()} page(s).`;
+    successEl.style.display = 'flex';
+  } catch (err) {
+    alert('Failed to add stamp: ' + err.message);
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg> Add Stamp to PDF';
 });
 
 document.getElementById('addPageNumBtn').addEventListener('click', async () => {
